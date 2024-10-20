@@ -63,7 +63,200 @@ impl FromStr for Circle {
     }
 }
 
+#[allow(dead_code)]
+enum Color {
+    Red,
+    Green,
+    Blue,
+    // These likewise tie `u32` tuples to different names: color models.
+    RGB(u32, u32, u32),
+}
+
+fn capture() {
+    use std::mem;
+    let color = String::from("green");
+    // A closure to print `color` which immediately borrows (`&`) `color` and
+    // stores the borrow and closure in the `print` variable. It will remain
+    // borrowed until `print` is used the last time.
+    // `println!` only requires arguments by immutable reference so it doesn't
+    // impose anything more restrictive.
+    let print = || println!("`color`: {}", color);
+
+    // Call the closure using the borrow.
+    print();
+
+    // `color` can be borrowed immutably again, because the closure only holds
+    // an immutable reference to `color`.
+    let _reborrow = &color;
+    print();
+
+    // A move or reborrow is allowed after the final use of `print`
+    let _color_moved = color;
+
+
+    let mut count = 0;
+    // A closure to increment `count` could take either `&mut count` or `count`
+    // but `&mut count` is less restrictive so it takes that. Immediately
+    // borrows `count`.
+    //
+    // A `mut` is required on `inc` because a `&mut` is stored inside. Thus,
+    // calling the closure mutates `count` which requires a `mut`.
+    let mut inc = || {
+        count += 1;
+        println!("`count`: {}", count);
+    };
+
+    // Call the closure using a mutable borrow.
+    inc();
+
+    // The closure still mutably borrows `count` because it is called later.
+    // An attempt to reborrow will lead to an error.
+    // let _reborrow = &count;
+    // ^ TODO: try uncommenting this line.
+    inc();
+
+    // The closure no longer needs to borrow `&mut count`. Therefore, it is
+    // possible to reborrow without an error
+    let _count_reborrowed = &mut count;
+
+
+    // A non-copy type.
+    let movable = Box::new(3);
+
+    // `mem::drop` requires `T` so this must take by value. A copy type
+    // would copy into the closure leaving the original untouched.
+    // A non-copy must move and so `movable` immediately moves into
+    // the closure.
+    let consume = || {
+        println!("`movable`: {:?}", movable);
+        mem::drop(movable);
+    };
+
+    // `consume` consumes the variable so this can only be called once.
+    consume();
+
+    // A function which takes a closure as an argument and calls it.
+    // <F> denotes that F is a "Generic type parameter"
+    fn apply<F>(f: F) where
+    // The closure takes no input and returns nothing.
+        F: FnOnce() {
+        // ^ TODO: Try changing this to `Fn` or `FnMut`.
+
+        f();
+    }
+
+    // A function which takes a closure and returns an `i32`.
+    fn apply_to_3<F>(f: F) -> i32 where
+    // The closure takes an `i32` and returns an `i32`.
+        F: Fn(i32) -> i32 {
+
+        f(3)
+    }
+
+    let greeting = "hello";
+    // A non-copy type.
+    // `to_owned` creates owned data from borrowed one
+    let mut farewell = "goodbye".to_owned();
+
+    // Capture 2 variables: `greeting` by reference and
+    // `farewell` by value.
+    let diary = || {
+        // `greeting` is by reference: requires `Fn`.
+        println!("I said {}.", greeting);
+
+        // Mutation forces `farewell` to be captured by
+        // mutable reference. Now requires `FnMut`.
+        farewell.push_str("!!!");
+        println!("Then I screamed {}.", farewell);
+        println!("Now I can sleep. zzzzz");
+
+        // Manually calling drop forces `farewell` to
+        // be captured by value. Now requires `FnOnce`.
+        mem::drop(farewell);
+    };
+
+    // Call the function which applies the closure.
+    apply(diary);
+
+    // `double` satisfies `apply_to_3`'s trait bound
+    let double = |x| 2 * x;
+
+    println!("3 doubled: {}", apply_to_3(double));
+    // Fn: the closure uses the captured value by reference (&T)
+    // FnMut: the closure uses the captured value by mutable reference (&mut T)
+    // FnOnce: the closure uses the captured value by value (T)
+
+    fn create_fn() -> impl Fn() {
+        let text = "Fn".to_owned();
+
+        move || println!("This is a: {}", text)
+    }
+
+    fn create_fnmut() -> impl FnMut() {
+        let text = "FnMut".to_owned();
+
+        move || println!("This is a: {}", text)
+    }
+
+    fn create_fnonce() -> impl FnOnce() {
+        let text = "FnOnce".to_owned();
+
+        move || println!("This is a: {}", text)
+    }
+
+    let fn_plain = create_fn();
+    let mut fn_mut = create_fnmut();
+    let fn_once = create_fnonce();
+
+    fn_plain();
+    fn_mut();
+    fn_once();
+    call_hof();
+}
+
+fn call_hof() {
+    use std::time::{Instant};
+    fn is_odd(n: u32) -> bool {
+        n % 2 == 1
+    }
+
+    println!("Find the sum of all the numbers with odd squares under 1000");
+    let upper = 1000;
+
+    // Imperative approach
+    // Declare accumulator variable
+    let start = Instant::now();
+    let mut acc = 0;
+    // Iterate: 0, 1, 2, ... to infinity
+    for n in 0.. {
+        // Square the number
+        let n_squared = n * n;
+
+        if n_squared >= upper {
+            // Break loop if exceeded the upper limit
+            break;
+        } else if is_odd(n_squared) {
+            // Accumulate value, if it's odd
+            acc += n_squared;
+        }
+    }
+    let duration = start.elapsed();
+    println!("imperative style: {}, elapsed nanos: {:?}", acc, duration);
+
+    let start2 = Instant::now();
+    // Functional approach
+    let sum_of_squared_odd_numbers: u32 =
+        (0..).map(|n| n * n)                             // All natural numbers squared
+            .take_while(|&n_squared| n_squared < upper) // Below upper limit
+            .filter(|&n_squared| is_odd(n_squared))     // That are odd
+            .sum();                                     // Sum them
+    println!("functional style (slower than before for loop case): {}", sum_of_squared_odd_numbers);
+    let duration = start2.elapsed();
+    println!("imperative style: {}, elapsed nanos: {:?}", acc, duration);
+}
+
 async fn manual_hello() -> impl Responder {
+
     // 1 do something you like
     let _immutable_binding = 1;
     let mut mutable_binding = 1;
@@ -186,9 +379,171 @@ async fn manual_hello() -> impl Responder {
         // 循环 5 次
         println!("for循环n值{}", _n);
     }
+    let mut car_names = vec!["比亚迪", "赛里斯", "小米S7"];
+    for car_name in car_names.iter_mut() {
+        *car_name = match car_name {
+            &mut "比亚迪" => "比亚迪品牌",
+            _ => "默认品牌",
+        }
+    }
 
-    HttpResponse::Ok().body(format!("{}, {:?}, {}， radius： {}, parse string {}",
-                                    mutable_binding, vec, my_string, circle.to_string(), sum))
+    let b = true;
+    // Match is an expression too
+    let b_number = match b {
+        // The arms of a match must cover all the possible values
+        false => 0,
+        true => 1,
+    };
+    println!("match {} 对应整型数据 {}", b, b_number);
+    let m_number = 11;
+    match m_number {
+        // Match a single value
+        1 => println!("一!"),
+        // Match several values
+        2 | 3 | 5 | 7 | 11 => println!("质数"),
+        // Match an inclusive range
+        13..=19 => println!("大于 12的整数"),
+        // Handle the rest of cases
+        _ => println!("默认，未匹配数据"),
+    }
+
+    // destructure
+    let triple = (0, "142857", "285714");
+    // Match can be used to destructure a tuple
+    match triple {
+        // Destructure the second and third elements
+        (0, y, z) => println!("`y` = {:?}, and `z` = {:?}", y, z),
+        (1, ..)  => println!("第一个是 1，其他数据不进行匹配"),
+        (.., "142857")  => println!("最后一个是 `142857`,其他数据不进行匹配"),
+        (3, .., "285714")  => println!("第一个是 `3`, 最后一个是 `285714`, 其他数据不进行匹配"),
+        // `..` can be used to ignore the rest of the tuple
+        _      => println!("未匹配到任何数据"),
+        // `_` 表示不将值绑定到变量
+    }
+
+    // Try changing the values in the array, or make it a slice!
+    let array = [1, 142857, 6];
+    match array {
+        // Binds the second and the third elements to the respective variables
+        [0, second, third] => println!("array[0] = 0, array[1] = {}, array[2] = {}", second, third),
+        // Single values can be ignored with _
+        [1, _, third] => println!("array[0] = 1, array[2] = {} and array[1] was ignored", third),
+        // You can also bind some and ignore the rest
+        [-1, second, ..] => println!("array[0] = -1, array[1] = {} and all the other ones were ignored", second),
+        // Or store them in another array/slice (the type depends on
+        // that of the value that is being matched against)
+        [3, second, tail @ ..] => println!("array[0] = 3, array[1] = {} and the other elements were {:?}", second, tail),
+        // Combining these patterns, we can, for example, bind the first and
+        // last values, and store the rest of them in a single array
+        [first, middle @ .., last] => println!("array[0] = {}, middle = {:?}, array[2] = {}", first, middle, last),
+    }
+
+    let color = Color::Blue;
+    // An `enum` can be destructured using a `match`.
+    match color {
+        Color::Red => println!("红色!"),
+        Color::Green => println!("绿色!"),
+        Color::Blue => println!("蓝色!"),
+        _ => println!("default color!"),
+    }
+
+    let mut mut_v1 = 142857;
+    // Use `ref mut` similarly.
+    match mut_v1 {
+        ref mut m => {
+            // Got a reference. Gotta dereference it before we can
+            // add anything to it.
+            *m += 142857;
+            println!("We added 142857. `mut_value`: {:?}", m);
+        },
+    }
+
+    struct Foo {
+        x: (u32, u32),
+        y: u32,
+    }
+
+    // Try changing the values in the struct to see what happens
+    let foo = Foo { x: (1, 2), y: 3 };
+
+    match foo {
+        Foo { x: (1, b), y } => println!("First of x is 1, b = {},  y = {} ", b, y),
+
+        // you can destructure structs and rename the variables,
+        // the order is not important
+        Foo { y: 2, x: i } => println!("y is 2, i = {:?}", i),
+
+        // and you can also ignore some variables:
+        Foo { y, .. } => println!("y = {}, we don't care about x", y),
+        // this will give an error: pattern does not mention field `x`
+        //Foo { y } => println!("y = {}", y),
+    }
+
+    let number: u8 = 4;
+
+    match number {
+        i if i == 0 => println!("Zero"),
+        i if i > 0 => println!("Greater than zero"),
+        _ => unreachable!("Should never happen."),
+    }
+    fn get_number() -> u32 {
+        17
+    }
+    match get_number() {
+        0             => println!("I haven't celebrated my first birthday yet"),
+        // Could `match` 1 ..= 12 directly but then what age
+        // would the child be? Instead, bind to `n` for the
+        // sequence of 1 ..= 12. Now the age can be reported.
+        n @ 1  ..= 12 => println!("I'm a child of age {:?}", n),
+        n @ 13 ..= 19 => println!("I'm a teen of age {:?}", n),
+        // Nothing bound. Return the result.
+        n             => println!("I'm an old person of age {:?}", n),
+    }
+
+    fn some_number() -> Option<u32> {
+        Some(142857)
+    }
+
+    match some_number() {
+        // Got `Some` variant, match if its value, bound to `n`,
+        // is equal to 42.
+        Some(n @ 42) => println!("The Answer: {}!", n),
+        // Match any other number.
+        Some(n)      => println!("Not interesting... {}", n),
+        // Match anything else (`None` variant).
+        _            => (),
+    }
+
+    // Make `optional` of type `Option<i32>`
+    let mut optional = Some(0);
+
+    // This reads: "while `let` destructures `optional` into
+    // `Some(i)`, evaluate the block (`{}`). Else `break`.
+    while let Some(i) = optional {
+        if i > 9 {
+            println!("Greater than 9, quit!");
+            optional = None;
+        } else {
+            optional = Some(i + 1);
+        }
+    }
+    // A closure taking no arguments which returns an `i32`.
+    // The return type is inferred.
+    let one = || 1;
+    println!("closure returning one: {}", one());
+
+    let outer_var = 42;
+    let closure_annotated = |i: i32| -> i32 { i + outer_var };
+    let closure_inferred  = |i     |          i + outer_var  ;
+    // Call the closures.
+    println!("closure_annotated: {}", closure_annotated(1));
+    println!("closure_inferred: {}", closure_inferred(1));
+
+    // function capture
+    capture();
+
+    HttpResponse::Ok().body(format!("{}, {:?}, {}， radius： {}, parse string {}, {:?}",
+                                    mutable_binding, vec, my_string, circle.to_string(), sum, car_names))
 }
 
 #[allow(dead_code)]

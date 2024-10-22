@@ -63,6 +63,68 @@ fn is_adult(age: &Years) -> bool {
     age.0 >= 18
 }
 
+use std::iter;
+use std::vec::IntoIter;
+
+#[allow(dead_code)]
+// This function combines two `Vec<i32>` and returns an iterator over it.
+// Look how complicated its return type is!
+fn combine_vecs_explicit_return_type(
+    v: Vec<i32>,
+    u: Vec<i32>,
+) -> iter::Cycle<iter::Chain<IntoIter<i32>, IntoIter<i32>>> {
+    v.into_iter().chain(u.into_iter()).cycle()
+}
+
+// This is the exact same function, but its return type uses `impl Trait`.
+// Look how much simpler it is!
+fn combine_vecs(
+    v: Vec<i32>,
+    u: Vec<i32>,
+) -> impl Iterator<Item=i32> {
+    v.into_iter().chain(u.into_iter()).cycle()
+}
+
+// Returns a function that adds `y` to its input
+fn make_adder_function(y: i32) -> impl Fn(i32) -> i32 {
+    let closure = move |x: i32| { x + y };
+    closure
+}
+
+fn double_positives<'a>(numbers: &'a Vec<i32>) -> impl Iterator<Item = i32> + 'a {
+    numbers.iter()
+        .filter(|x| x > &&0)
+        .map(|x| x * 142857)
+}
+
+trait UsernameWidget {
+    // Get the selected username out of this widget
+    fn get(&self) -> String;
+}
+
+trait AgeWidget {
+    // Get the selected age out of this widget
+    fn get(&self) -> u8;
+}
+
+// A form with both a UsernameWidget and an AgeWidget
+struct Form {
+    username: String,
+    age: u8,
+}
+
+impl UsernameWidget for Form {
+    fn get(&self) -> String {
+        self.username.clone()
+    }
+}
+
+impl AgeWidget for Form {
+    fn get(&self) -> u8 {
+        self.age
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -90,5 +152,35 @@ mod tests {
         println!("Is an adult? {}", is_adult(&age));
         println!("Is an adult? {}", is_adult(&age_days.to_years()));
         println!("Is an adult? {}", is_adult(&age));
+
+        // combine the vectors
+        let v1 = vec![1, 2, 3];
+        let v2 = vec![4, 5];
+        let mut v3 = combine_vecs(v1, v2);
+        assert_eq!(Some(1), v3.next());
+        assert_eq!(Some(2), v3.next());
+        assert_eq!(Some(3), v3.next());
+        assert_eq!(Some(4), v3.next());
+        assert_eq!(Some(5), v3.next());
+
+        let plus_one = make_adder_function(1);
+        assert_eq!(plus_one(2), 3);
+
+        let singles = vec![-3, -2, 2, 3, 4, 5,6,7];
+        let doubles = double_positives(&singles);
+        println!(">>> positive double {:?}", doubles.collect::<Vec<i32>>());
+
+        let form = Form {
+            username: "rustacean".to_owned(),
+            age: 28,
+        };
+        // If you uncomment this line, you'll get an error saying
+        // "multiple `get` found". Because, after all, there are multiple methods
+        // named `get`.
+        // println!("{}", form.get());
+        let username = <Form as UsernameWidget>::get(&form);
+        assert_eq!("rustacean".to_owned(), username);
+        let age = <Form as AgeWidget>::get(&form);
+        assert_eq!(28, age);
     }
 }

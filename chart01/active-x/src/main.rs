@@ -1,3 +1,4 @@
+
 use actix_web::{get, post, error, web, App, middleware::Logger, HttpResponse, HttpServer, Responder, Result, HttpRequest};
 use serde::Deserialize;
 use futures::{future::ok, stream::once};
@@ -253,8 +254,301 @@ fn call_hof() {
     println!("functional style (slower than before for loop case): {}", sum_of_squared_odd_numbers);
     let duration = start2.elapsed();
     println!("imperative style: {}, elapsed nanos: {:?}", acc, duration);
+
+    do_rule();
 }
 
+fn do_rule() {
+    // This function takes ownership of the heap allocated memory
+    fn destroy_box(c: Box<i32>) {
+        println!("Destroying a box that contains {}", c);
+
+        // `c` is destroyed and the memory freed
+    }
+
+    // _Stack_ allocated integer
+    let x = 5u32;
+
+    // *Copy* `x` into `y` - no resources are moved
+    let y = x;
+
+    // Both values can be independently used
+    println!("x is {}, and y is {}", x, y);
+
+    // `a` is a pointer to a _heap_ allocated integer
+    let a = Box::new(5i32);
+
+    println!("a contains: {}", a);
+
+    // *Move* `a` into `b`
+    let b = a;
+    // The pointer address of `a` is copied (not the data) into `b`.
+    // Both are now pointers to the same heap allocated data, but
+    // `b` now owns it.
+
+    // Error! `a` can no longer access the data, because it no longer owns the
+    // heap memory
+    //println!("a contains: {}", a);
+    // TODO ^ Try uncommenting this line
+
+    // This function takes ownership of the heap allocated memory from `b`
+    destroy_box(b);
+
+    // Since the heap memory has been freed at this point, this action would
+    // result in dereferencing freed memory, but it's forbidden by the compiler
+    // Error! Same reason as the previous Error
+    // println!("b contains: {}", b);
+
+    let immutable_box = Box::new(5u32);
+    println!("immutable_box contains {}", immutable_box);
+    // Mutability error
+    //*immutable_box = 4;
+    // *Move* the box, changing the ownership (and mutability)
+    let mut mutable_box = immutable_box;
+    println!("mutable_box contains {}", mutable_box);
+    // Modify the contents of the box
+    *mutable_box = 4;
+    println!("mutable_box now contains {}", mutable_box);
+
+    #[derive(Debug)]
+    struct Person {
+        name: String,
+        age: Box<u8>,
+    }
+
+    let person = Person {
+        name: String::from("Alice"),
+        age: Box::new(20),
+    };
+
+    // `name` is moved out of person, but `age` is referenced
+    let Person { name, ref age } = person;
+    println!("The person's age is {}", age);
+    println!("The person's name is {}", name);
+    // Error! borrow of partially moved value: `person` partial move occurs
+    //println!("The person struct is {:?}", person);
+    // `person` cannot be used but `person.age` can be used as it is not moved
+    println!("The person's age from person struct is {}", person.age);
+
+    // This function takes ownership of a box and destroys it
+    fn eat_box_i32(boxed_i32: Box<i32>) {
+        println!("Destroying box that contains {}", boxed_i32);
+    }
+
+    // This function borrows an i32
+    fn borrow_i32(borrowed_i32: &i32) {
+        println!("This int is: {}", borrowed_i32);
+    }
+    // Create a boxed i32 in the heap, and a i32 on the stack
+    // Remember: numbers can have arbitrary underscores added for readability
+    // 5_i32 is the same as 5i32
+    let boxed_i32 = Box::new(5_i32);
+    let stacked_i32 = 6_i32;
+
+    // Borrow the contents of the box. Ownership is not taken,
+    // so the contents can be borrowed again.
+    borrow_i32(&boxed_i32);
+    borrow_i32(&stacked_i32);
+    {
+        // Take a reference to the data contained inside the box
+        let _ref_to_i32: &i32 = &boxed_i32;
+
+        // Error!
+        // Can't destroy `boxed_i32` while the inner value is borrowed later in scope.
+        // eat_box_i32(boxed_i32);
+        // FIXME ^ Comment out this line
+
+        // Attempt to borrow `_ref_to_i32` after inner value is destroyed
+        borrow_i32(_ref_to_i32);
+        // `_ref_to_i32` goes out of scope and is no longer borrowed.
+    }
+    // `boxed_i32` can now give up ownership to `eat_box_i32` and be destroyed
+    eat_box_i32(boxed_i32);
+
+    struct Point { x: i32, y: i32, z: i32 }
+    let mut point = Point { x: 0, y: 0, z: 0 };
+
+    let borrowed_point = &point;
+    let another_borrow = &point;
+
+    // Data can be accessed via the references and the original owner
+    println!("Point has coordinates: ({}, {}, {})",
+             borrowed_point.x, another_borrow.y, point.z);
+
+    // Error! Can't borrow `point` as mutable because it's currently
+    // borrowed as immutable.
+    // let mutable_borrow = &mut point;
+    // TODO ^ Try uncommenting this line
+
+    // The borrowed values are used again here
+    println!("Point has coordinates: ({}, {}, {})",
+             borrowed_point.x, another_borrow.y, point.z);
+
+    // The immutable references are no longer used for the rest of the code so
+    // it is possible to reborrow with a mutable reference.
+    let mutable_borrow = &mut point;
+
+    // Change data via mutable reference
+    mutable_borrow.x = 142857;
+    mutable_borrow.y = 142857;
+    mutable_borrow.z = 999999;
+
+    // Error! Can't borrow `point` as immutable because it's currently
+    // borrowed as mutable.
+    // let y = &point.y;
+    // TODO ^ Try uncommenting this line
+    // Error! Can't print because `println!` takes an immutable reference.
+    // println!("Point Z coordinate is {}", point.z);
+    // TODO ^ Try uncommenting this line
+    // Ok! Mutable references can be passed as immutable to `println!`
+    println!("Point has coordinates: ({}, {}, {})",
+             mutable_borrow.x, mutable_borrow.y, mutable_borrow.z);
+
+    // The mutable reference is no longer used for the rest of the code so it
+    // is possible to reborrow
+    let new_borrowed_point = &point;
+    println!("Point now has coordinates: ({}, {}, {})",
+             new_borrowed_point.x, new_borrowed_point.y, new_borrowed_point.z);
+    run_ref();
+}
+
+fn run_ref() {
+    #[derive(Clone, Copy)]
+    struct Point { x: i32, y: i32 }
+
+    let c = 'Q';
+
+    // A `ref` borrow on the left side of an assignment is equivalent to
+    // an `&` borrow on the right side.
+    let ref ref_c1 = c;
+    let ref_c2 = &c;
+
+    println!("ref_c1 equals ref_c2: {}", *ref_c1 == *ref_c2);
+
+    let point = Point { x: 0, y: 0 };
+
+    // `ref` is also valid when destructuring a struct.
+    let _copy_of_x = {
+        // `ref_to_x` is a reference to the `x` field of `point`.
+        let Point { x: ref ref_to_x, y: _ } = point;
+
+        // Return a copy of the `x` field of `point`.
+        *ref_to_x
+    };
+
+    // A mutable copy of `point`
+    let mut mutable_point = point;
+    {
+        // `ref` can be paired with `mut` to take mutable references.
+        let Point { x: _, y: ref mut mut_ref_to_y } = mutable_point;
+
+        // Mutate the `y` field of `mutable_point` via a mutable reference.
+        *mut_ref_to_y = 1;
+    }
+
+    println!("point is ({}, {})", point.x, point.y);
+    println!("mutable_point is ({}, {})", mutable_point.x, mutable_point.y);
+
+    // A mutable tuple that includes a pointer
+    let mut mutable_tuple = (Box::new(281457u32), 3u32);
+
+    {
+        // Destructure `mutable_tuple` to change the value of `last`.
+        let (_, ref mut last) = mutable_tuple;
+        *last = 142857_u32;
+    }
+
+    println!("tuple is {:?}", mutable_tuple);
+
+    run_lifetime()
+}
+
+fn run_lifetime() {
+    struct Owner(i32);
+    impl Owner {
+        // Annotate lifetimes as in a standalone function.
+        fn add_one<'a>(&'a mut self) { self.0 += 1; }
+        fn print<'a>(&'a self) {
+            println!("`print`: {}", self.0);
+        }
+    }
+
+    let mut owner = Owner(1142857);
+
+    owner.add_one();
+    owner.print();
+
+    run_dyn_trait();
+}
+
+fn run_dyn_trait() {
+    struct Sheep {}
+    struct Cow {}
+
+    trait Animal {
+        // Instance method signature
+        fn noise(&self) -> &'static str;
+    }
+
+    // Implement the `Animal` trait for `Sheep`.
+    impl Animal for Sheep {
+        fn noise(&self) -> &'static str {
+            "Sheep baaaaah!"
+        }
+    }
+
+    // Implement the `Animal` trait for `Cow`.
+    impl Animal for Cow {
+        fn noise(&self) -> &'static str {
+            "Cow moooooo!"
+        }
+    }
+
+    // Returns some struct that implements Animal, but we don't know which one at compile time.
+    fn random_animal(random_number: f64) -> Box<dyn Animal> {
+        if random_number < 0.5 {
+            Box::new(Sheep {})
+        } else {
+            Box::new(Cow {})
+        }
+    }
+
+    let random_number = 0.234;
+    let animal = random_animal(random_number);
+    println!("You've randomly chosen an animal, and it says {}", animal.noise());
+
+    struct Droppable {
+        name: &'static str,
+    }
+
+    // This trivial implementation of `drop` adds a print to console.
+    impl Drop for Droppable {
+        fn drop(&mut self) {
+            println!("> Dropping {}", self.name);
+        }
+    }
+    let _a = Droppable { name: "a" };
+
+    // block A
+    {
+        let _b = Droppable { name: "b" };
+
+        // block B
+        {
+            let _c = Droppable { name: "c" };
+            let _d = Droppable { name: "d" };
+
+            println!("Exiting block B");
+        }
+        println!("Just exited block B");
+
+        println!("Exiting block A");
+    }
+    println!("Just exited block A");
+
+    // Variable can be manually dropped using the `drop` function
+    drop(_a);
+}
 async fn manual_hello() -> impl Responder {
 
     // 1 do something you like
@@ -657,3 +951,4 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
+// resources can only have one owner

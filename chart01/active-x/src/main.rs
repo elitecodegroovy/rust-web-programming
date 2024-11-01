@@ -548,6 +548,48 @@ fn run_dyn_trait() {
 
     // Variable can be manually dropped using the `drop` function
     drop(_a);
+
+    run_macro();
+}
+
+fn run_macro() {
+    // `test!` will compare `$left` and `$right`
+    // in different ways depending on how you invoke it:
+    macro_rules! test_exp {
+        // Arguments don't need to be separated by a comma.
+        // Any template can be used!
+        ($left:expr; and $right:expr) => {
+            println!("{:?} and {:?} is {:?}",
+                     stringify!($left),
+                     stringify!($right),
+                     $left && $right)
+        };
+        // ^ each arm must end with a semicolon.
+        ($left:expr; or $right:expr) => {
+            println!("{:?} or {:?} is {:?}",
+                     stringify!($left),
+                     stringify!($right),
+                     $left || $right)
+        };
+    }
+    test_exp!(1i32 + 1 == 2i32; and 2i32 * 2 == 4i32);
+    test_exp!(true; or false);
+
+    // 2. Macros can use + in the argument list to indicate that an argument may repeat at least once, or *, to indicate that the argument may repeat zero or more times.
+    // `find_min!` will calculate the minimum of any number of arguments.
+    macro_rules! find_min {
+        // Base case:
+        ($x:expr) => ($x);
+        // `$x` followed by at least one `$y,`
+        ($x:expr, $($y:expr),+) => (
+            // Call `find_min!` on the tail `$y`
+            std::cmp::min($x, find_min!($($y),+))
+        )
+    }
+
+    println!("min: {}", find_min!(1));
+    println!("min: {}", find_min!(1 + 20, 2));
+    println!("min: {}", find_min!(500, 2 * 3, 4));
 }
 async fn manual_hello() -> impl Responder {
 

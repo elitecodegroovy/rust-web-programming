@@ -190,6 +190,7 @@ pub fn do_create_file() {
     }
 }
 
+#[allow(dead_code)]
 pub fn do_read_file_lines() {
     use std::fs::File;
     use std::io::{self, BufRead};
@@ -211,6 +212,26 @@ pub fn do_read_file_lines() {
     }
 }
 
+#[allow(dead_code)]
+pub fn do_cmd() {
+    use std::process::Command;
+
+    let output = Command::new("rustc")
+        .arg("--version")
+        .output().unwrap_or_else(|e| {
+        panic!("failed to execute process: {}", e)
+    });
+
+    if output.status.success() {
+        let s = String::from_utf8_lossy(&output.stdout);
+
+        print!("rustc succeeded and stdout was:\n{}", s);
+    } else {
+        let s = String::from_utf8_lossy(&output.stderr);
+
+        print!("rustc failed and stderr was:\n{}", s);
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -231,5 +252,6 @@ mod tests {
         do_read_file();
         do_create_file();
         do_read_file_lines();
+        do_cmd();
     }
 }

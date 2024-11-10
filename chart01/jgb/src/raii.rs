@@ -233,12 +233,94 @@ pub fn do_cmd() {
     }
 }
 
+#[allow(dead_code)]
+pub fn do_ffi() {
+    use std::fmt;
+
+    // this extern block links to the libm library
+    #[cfg(target_family = "windows")]
+    #[link(name = "msvcrt")]
+    extern {
+        // this is a foreign function
+        // that computes the square root of a single precision complex number
+        fn csqrtf(z: Complex) -> Complex;
+
+        fn ccosf(z: Complex) -> Complex;
+    }
+    #[cfg(target_family = "unix")]
+    #[link(name = "m")]
+    extern {
+        // this is a foreign function
+        // that computes the square root of a single precision complex number
+        fn csqrtf(z: Complex) -> Complex;
+
+        fn ccosf(z: Complex) -> Complex;
+    }
+
+    // Since calling foreign functions is considered unsafe,
+    // it's common to write safe wrappers around them.
+    fn cos(z: Complex) -> Complex {
+        unsafe { ccosf(z) }
+    }
+
+    // Minimal implementation of single precision complex numbers
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct Complex {
+        re: f32,
+        im: f32,
+    }
+
+    impl fmt::Debug for Complex {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            if self.im < 0. {
+                write!(f, "{}-{}i", self.re, -self.im)
+            } else {
+                write!(f, "{}+{}i", self.re, self.im)
+            }
+        }
+    }
+
+    // z = -1 + 0i
+    let z = Complex { re: -1., im: 0. };
+
+    // calling a foreign function is an unsafe operation
+    let z_sqrt = unsafe { csqrtf(z) };
+
+    println!("the square root of {:?} is {:?}", z, z_sqrt);
+
+    // calling safe API wrapped around unsafe operation
+    println!("cos({:?}) = {:?}", z, cos(z));
+}
+
+pub fn do_sqrt(f : f64) -> Result<f64, String> {
+    if f > 0.0 {
+        Ok(f.powf(0.5))
+    } else {
+        Err("can not handle negative number {f}".to_owned())
+    }
+}
+
+pub fn do_unsafe() {
+    let raw_p: *const u32 = &10;
+
+    unsafe {
+        assert!(*raw_p == 10);
+    }
+}
+
+/// 1. cmd : cargo test
+/// 2. specify test case: cargo test test_do_sqrt
+/// 3. Tests can be marked with the #[ignore] attribute to exclude some tests. cmd:
+/// only test ignore case: cargo test -- --ignored
+/// skip ignore test : cargo test
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq; // crate for test-only use
 
     #[test]
-    fn run_raii() {
+    fn test_run_raii() {
         // Creating lots of boxes just for fun
         // There's no need to manually free memory!
         for _ in 0u32..1_000 {
@@ -253,5 +335,20 @@ mod tests {
         do_create_file();
         do_read_file_lines();
         do_cmd();
+        do_ffi();
+        do_unsafe();
+        use std::arch::asm;
+
+        unsafe {
+            asm!("nop");
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_do_sqrt() -> Result<(), Box<dyn std::error::Error>>{
+        let x = 4.0;
+        assert_eq!(do_sqrt(x)?.powf(2.0), x);
+        Ok(())
     }
 }

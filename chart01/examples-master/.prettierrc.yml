@@ -1,0 +1,7 @@
+arrowParens: "avoid"
+semi: false
+overrides:
+  - files: "*.md"
+    options:
+      printWidth: 9999
+      proseWrap: "never"

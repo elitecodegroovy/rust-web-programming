@@ -1,0 +1,11 @@
+[package]
+name = "juniper-example"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+actix-web.workspace = true
+actix-cors.workspace = true
+juniper = "0.16"
+env_logger.workspace = true
+log.workspace = true

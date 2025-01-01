@@ -898,9 +898,7 @@ struct Info {
 /// extract path info using serde
 #[get("/users/{user_id}/{friend}")] // <- define path parameters
 async fn index(info: web::Path<Info>) -> Result<String> {
-    Ok(format!(
-        "Welcome {}, user_id {}!",
-        info.friend, info.user_id
+    Ok(format!("Welcome {}, user_id {}!", info.friend, info.user_id
     ))
 }
 
@@ -910,6 +908,21 @@ async fn index2(req: HttpRequest) -> Result<String> {
     let userid: i32 = req.match_info().query("user_id").parse().unwrap();
 
     Ok(format!("Welcome {}, user_id {}!", name, userid))
+}
+// 获取系统名称
+#[get("/index3")]
+async fn index3(data: web::Data<AppState>) -> String {
+    let app_name = &data.app_name; // <- get app_name
+    format!("system name : {app_name}!") // <- response with app_name
+}
+
+// 获取系统名称
+#[get("/index4")]
+async fn index4(data: web::Data<AppState>) -> String {
+    let app_name = &data.app_name; // <- get app_name
+    // std::thread::sleep(Duration::from_secs(5)); // <-- Bad practice! Will cause the current worker thread to hang!
+    tokio::time::sleep(Duration::from_secs(5)).await; // <-- Ok. Worker thread will handle other requests here
+    format!("system name : {app_name}!") // <- response with app_name
 }
 
 #[derive(Deserialize)]
@@ -953,6 +966,15 @@ async fn index_for_err() -> Result<&'static str, MyError> {
     info!("{}", err);
     Err(err)
 }
+// resource route location request
+// this function could be located in a different module
+fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::resource("/gapi/test1")
+            .route(web::get().to(|| async { HttpResponse::Ok().body("test1") }))
+            .route(web::head().to(HttpResponse::MethodNotAllowed)),
+    );
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -975,6 +997,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(AppState {
                     app_name: String::from("FastlyActix"),
                 }))
+            .configure(config)
             .service(
                 web::scope("/gapi")
                     .app_data(json_config)
@@ -983,12 +1006,15 @@ async fn main() -> std::io::Result<()> {
                     .service(submit_form)
                     .service(index)
                     .service(index2)
+                    .service(index3)
+                    .service(index4)
                     .service(get_query_params)
                     .service(stream)
                     .service(index_for_err)
             )
 
     })
+       // .workers(4)  // by default this number is equal to the number of physical CPUs in the system
     .bind("0.0.0.0:8080")?
     .run()
     .await

@@ -1,12 +1,19 @@
 
 use actix_web::{get, post, error, web, App, middleware::Logger, HttpResponse, HttpServer, Responder, Result, HttpRequest};
+use actix_web::{ body::BoxBody, http::header::ContentType };
+use serde::Serialize;
 use serde::Deserialize;
 use futures::{future::ok, stream::once};
 
 use derive_more::derive::{Display, Error};
 use log::info;
+use std::time::Duration;
 
 use std::convert::Into;
+use std::cell::Cell;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -884,8 +891,11 @@ async fn manual_hello() -> impl Responder {
 
 #[allow(dead_code)]
 #[derive(Debug)]
+#[derive(Clone)]
 struct AppState {
     app_name: String,
+    count: Cell<usize>,
+    global_count: Arc<AtomicUsize>,
 }
 
 //noinspection ALL
@@ -926,6 +936,17 @@ async fn index4(data: web::Data<AppState>) -> String {
 }
 
 #[derive(Deserialize)]
+struct FormData {
+    username: String,
+}
+
+// URL-Encoded Forms
+#[post("/indexFormData")]
+async fn index_form_data(data: web::Form<FormData>) -> Result<String> {
+    Ok(format!("Welcome {}!", data.username))
+}
+
+#[derive(Deserialize)]
 struct UserInfo {
     user_name: String,
     password: String,
@@ -941,9 +962,34 @@ async fn submit_form(info: web::Json<Info>) -> Result<String> {
     Ok(format!("Welcome {}, {}", info.user_id, info.friend))
 }
 
+#[derive(Serialize)]
+struct MyObj {
+    name: &'static str,
+    age: u32,
+}
+
+// Responder
+impl Responder for MyObj {
+    type Body = BoxBody;
+
+    fn respond_to(self, _req: &HttpRequest) -> HttpResponse<Self::Body> {
+        let body = serde_json::to_string(&self).unwrap();
+
+        // Create response and set content type
+        HttpResponse::Ok()
+            .content_type(ContentType::json())
+            .body(body)
+    }
+}
+
+async fn index_body_json() -> impl Responder {
+    MyObj { name: "user", age: 28 }
+}
+
 #[get("/stream")]
 async fn stream() -> HttpResponse {
-    let body = once(ok::<_, actix_web::Error>(web::Bytes::from_static(b"test")));
+    let txt_stream = b"Response body can be generated asynchronously. In this case, body must implement the stream trait Stream<Item = Result<Bytes, Error>>";
+    let body = once(ok::<_, actix_web::Error>(web::Bytes::from_static(txt_stream)));
 
     HttpResponse::Ok()
         .content_type("application/json")
@@ -976,13 +1022,41 @@ fn config(cfg: &mut web::ServiceConfig) {
     );
 }
 
+#[get("/get_count")]
+async fn get_count(data: web::Data<AppState>) -> impl Responder {
+    format!("count: {}, global count {}", data.count.get(), data.global_count.load(Ordering::Relaxed))
+}
+
+#[post("/increase_one")]
+async fn increase_one(data: web::Data<AppState>) -> impl Responder {
+    let count = data.count.get();
+    data.global_count.fetch_add(1, Ordering::Relaxed);
+    data.count.set(count + 1);
+
+    format!("count: {}, global count {}", data.count.get(), data.global_count.load(Ordering::Relaxed))
+}
+
+use actix_web::{Either, Error};
+
+type RegisterResult = Either<HttpResponse, Result<&'static str, Error>>;
+
+async fn index_two_body_type(info: web::Query<UserInfo>) -> RegisterResult {
+    if info.user_name == "admin" {
+        // choose Left variant
+        Either::Left(HttpResponse::BadRequest().body("Bad data"))
+    } else {
+        // choose Right variant
+        Either::Right(Ok("Hello!"))
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     unsafe { std::env::set_var("RUST_LOG", "info"); }
     unsafe { std::env::set_var("RUST_BACKTRACE", "1"); }
     env_logger::init();
 
-    HttpServer::new(|| {
+    HttpServer::new(move || {
         let logger = Logger::default();
         let json_config = web::JsonConfig::default()
             // 4K * 225
@@ -992,22 +1066,30 @@ async fn main() -> std::io::Result<()> {
                 error::InternalError::from_response(err, HttpResponse::Conflict().finish())
                     .into()
             });
+        let data = AppState {
+            app_name: String::from("FastlyActix"),
+            count: Cell::new(0),
+            global_count: Arc::new(AtomicUsize::new(0))
+        };
         App::new()
             .wrap(logger)
-            .app_data(web::Data::new(AppState {
-                    app_name: String::from("FastlyActix"),
-                }))
             .configure(config)
             .service(
                 web::scope("/gapi")
                     .app_data(json_config)
+                    .app_data(web::Data::new(data.clone()))
                     .route("/hi", web::get().to(manual_hello))
                     .route("/index2", web::get().to(manual_hello))
+                    .route("/indexBodyJson", web::get().to(index_body_json))
+                    .route("/indexTwoBody", web::get().to(index_two_body_type))
                     .service(submit_form)
                     .service(index)
                     .service(index2)
                     .service(index3)
                     .service(index4)
+                    .service(get_count)
+                    .service(increase_one)
+                    .service(index_form_data)
                     .service(get_query_params)
                     .service(stream)
                     .service(index_for_err)

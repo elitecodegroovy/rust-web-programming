@@ -1036,17 +1036,16 @@ async fn increase_one(data: web::Data<AppState>) -> impl Responder {
     format!("count: {}, global count {}", data.count.get(), data.global_count.load(Ordering::Relaxed))
 }
 
-use actix_web::{Either, Error};
 
-type RegisterResult = Either<HttpResponse, Result<&'static str, Error>>;
+type RegisterResult = actix_web::Either<HttpResponse, Result<&'static str, actix_web::Error>>;
 
 async fn index_two_body_type(info: web::Query<UserInfo>) -> RegisterResult {
     if info.user_name == "admin" {
         // choose Left variant
-        Either::Left(HttpResponse::BadRequest().body("Bad data"))
+        actix_web::Either::Left(HttpResponse::BadRequest().body("Bad data"))
     } else {
         // choose Right variant
-        Either::Right(Ok("Hello!"))
+        actix_web::Either::Right(Ok("Hello!"))
     }
 }
 

@@ -32,5 +32,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     get_request().await?;
     post_request().await?;
     Ok(())
-
 }

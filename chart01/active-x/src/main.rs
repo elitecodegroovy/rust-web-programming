@@ -1,6 +1,6 @@
 
 use actix_web::{get, post, error, web, App,http::{self, header::ContentEncoding, StatusCode}, middleware::Compress, middleware::Logger, HttpResponse, HttpServer, Responder, Result, HttpRequest};
-use actix_web::{ body::BoxBody, http::header::ContentType };
+use actix_web::{ body::{MessageBody, BoxBody}, http::header::ContentType, http::{header}, middleware::{from_fn, Next}, dev::{ServiceRequest, ServiceResponse, Service as _}, middleware::{ErrorHandlerResponse, ErrorHandlers}};
 use serde::Serialize;
 use serde::Deserialize;
 use std::task::Poll;
@@ -8,6 +8,7 @@ use futures::{future::ok, stream::once};
 
 use derive_more::derive::{Display, Error};
 use log::info;
+use log::error as error_log;
 use std::time::Duration;
 
 use std::convert::Into;
@@ -61,6 +62,7 @@ impl fmt::Display for Circle {
 
 use std::num::ParseIntError;
 use std::str::FromStr;
+// use futures_util::StreamExt;
 
 impl FromStr for Circle {
     type Err = ParseIntError;
@@ -1079,9 +1081,40 @@ async fn stream_sse(_req: HttpRequest) -> HttpResponse {
         .streaming(server_events)
 }
 
+#[allow(dead_code)]
+async fn index_plaintext_call() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type(ContentType::plaintext())
+        .insert_header(("X-Hdr", "sample"))
+        .body("data")
+}
+
+
+async fn my_x_middleware(
+    req: ServiceRequest,
+    next: Next<impl MessageBody>,
+) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    info!("my_x_middleware before> > > {}", req.path());
+    let res = next.call(req).await;
+    // post-processing
+    info!("my_x_middleware after > > >");
+    res
+}
+
+fn add_error_header<B>(mut res: ServiceResponse<B>) -> Result<ErrorHandlerResponse<B>> {
+    error_log!(">>>  error_header ");
+    res.response_mut().headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("Error"),
+    );
+
+    Ok(ErrorHandlerResponse::Response(res.map_into_left_body()))
+}
+
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    use futures_util::future::FutureExt;
     // Actix logs all errors at the WARN log level.
     unsafe { std::env::set_var("RUST_LOG", "info"); }
     unsafe { std::env::set_var("RUST_BACKTRACE", "1"); }
@@ -1105,6 +1138,18 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(logger)
             .wrap(Compress::default())
+            .wrap_fn(|req, srv| {
+                info!(">>>. You requested: {}", req.path());
+                srv.call(req).map(|res| {
+                    info!(">>>. You response ");
+                    res
+                })
+            })
+            .wrap(from_fn(my_x_middleware))
+            .wrap(
+                ErrorHandlers::new()
+                    .handler(StatusCode::INTERNAL_SERVER_ERROR, add_error_header),
+            )
             .configure(config)
             .service(
                 web::scope("/gapi")
@@ -1115,6 +1160,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/indexBodyJson", web::get().to(index_body_json))
                     .route("/indexTwoBody", web::get().to(index_two_body_type))
                     .route("/stream_sse", web::get().to(stream_sse))
+                    .service(web::resource("/error-not-found").route(web::get().to(HttpResponse::InternalServerError)))
                     .service(submit_form)
                     .service(index_path_info)
                     .service(index2)
@@ -1211,6 +1257,23 @@ mod tests {
             web::Bytes::from_static(b"data: 5\n\ndata: 4\n\ndata: 3\n\ndata: 2\n\ndata: 1\n\n")
         );
     }
+
+    // just test method calling
+    #[actix_web::test]
+    async fn test_index_ok() {
+        // let req = test::TestRequest::default()
+        //     .insert_header(ContentType::plaintext())
+        //     .to_http_request();
+        let resp = index_plaintext_call().await;
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    // #[actix_web::test]
+    // async fn test_index_not_ok() {
+    //     let req = test::TestRequest::default().to_http_request();
+    //     let resp = index_plaintext_call(req).await;
+    //     assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+    // }
 
 }
 

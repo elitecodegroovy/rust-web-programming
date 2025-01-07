@@ -13,3 +13,4 @@ derive_more= { version = "1", features = ["full"] }
 tokio = "1.40.0"
 serde_json = "1.0.128"
 http = "0.2.12"
+futures-util = "0.3.31"

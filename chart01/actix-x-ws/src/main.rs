@@ -1161,6 +1161,7 @@ use diesel::prelude::*;
 use self::models::*;
 use dotenvy::dotenv;
 use std::env;
+#[allow(unused_imports)]
 use diesel::r2d2::{self, ConnectionManager, Error};
 
 // simple type
@@ -1215,6 +1216,37 @@ async fn index_json_diesel(pool: web::Data<DbPool>) -> impl Responder {
         println!("-----------");
         println!("{}", post.body);
     }
+
+    MyObj { name: "user", age: 28 }
+}
+
+#[allow(dead_code)]
+async fn update_posts(pool: web::Data<DbPool>) -> impl Responder {
+
+    use self::schema::r_posts::dsl::*;
+
+    let mut con = pool.get().expect("Failed to get DB connection");
+    let post = diesel::update(r_posts.find(1))
+        .set(published.eq(false))
+        .returning(RPosts::as_returning())
+        .get_result(&mut con)
+        .unwrap();
+    println!("Published post {}", post.title);
+
+    MyObj { name: "user", age: 28 }
+}
+
+#[allow(dead_code)]
+async fn delete_posts(pool: web::Data<DbPool>) -> impl Responder {
+
+    use self::schema::r_posts::dsl::*;
+
+    let mut con = pool.get().expect("Failed to get DB connection");
+    let num_deleted = diesel::delete(r_posts.filter(title.like("%test%".to_owned())))
+        .execute(&mut con)
+        .expect("Error deleting posts");
+
+    println!("Deleted {} posts", num_deleted);
 
     MyObj { name: "user", age: 28 }
 }

@@ -7,7 +7,6 @@ edition = "2021"
 actix-web = { version = "4" }
 actix-ws = { version = "0.3.0" }
 serde = { version = "1.0.210", features = ["derive"] }
-diesel = { version = "2", features = ["sqlite", "r2d2", "uuid"] }
 futures = "0.3"
 env_logger = "0.8"
 log = "0.4"
@@ -16,3 +15,9 @@ tokio = "1.40.0"
 serde_json = "1.0.128"
 http = "0.2.12"
 futures-util = "0.3.31"
+# build libpq and openssl as part of the build process
+# uncomment these lines if you run into setup issues
+# pq-sys = { version = "0.6", features = ["bundled"] }
+# openssl-sys = { version = "0.9.100", features = ["vendored"] }
+diesel = { version = "2", features = ["sqlite", "r2d2", "uuid", "postgres"] }
+dotenvy = "0.15"

@@ -1,5 +1,7 @@
+mod schema;
+mod models;
 
-use actix_web::{get, post, error, web, App,http::{self, header::ContentEncoding, StatusCode}, middleware::Compress, middleware::Logger, HttpResponse, HttpServer, Responder, Result, HttpRequest};
+use actix_web::{get, post, error, web, App, http::{self, header::ContentEncoding, StatusCode}, middleware::Compress, middleware::Logger, HttpResponse, HttpServer, Responder, Result, HttpRequest};
 use actix_web::{ rt, body::{MessageBody, BoxBody}, http::header::ContentType, http::{header}, middleware::{from_fn, Next}, dev::{ServiceRequest, ServiceResponse, Service as _}, middleware::{ErrorHandlerResponse, ErrorHandlers}};
 use serde::Serialize;
 use serde::Deserialize;
@@ -909,6 +911,11 @@ struct Info {
     friend: String,
 }
 
+#[derive(Deserialize)]
+struct PostInfo {
+    title: String,
+    body: String,
+}
 /// extract path info using serde
 #[get("/users/{user_id}/{friend}")] // <- define path parameters
 async fn index_path_info(info: web::Path<Info>) -> Result<String> {
@@ -1150,7 +1157,63 @@ async fn echo(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, ac
     Ok(res)
 }
 
+use diesel::prelude::*;
+use self::models::*;
+use dotenvy::dotenv;
+use std::env;
 
+pub fn establish_connection() -> PgConnection {
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    PgConnection::establish(&database_url)
+        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
+}
+
+pub fn create_post(conn: &mut PgConnection, title: &str, body: &str) -> RPosts {
+    use crate::schema::r_posts;
+    let new_post = NewPost { title, body };
+
+    diesel::insert_into(r_posts::table)
+        .values(&new_post)
+        .returning(RPosts::as_returning())
+        .get_result(conn)
+        .expect("Error saving new post")
+}
+
+#[post("/createPosts")]
+async fn create_posts(info: web::Json<PostInfo>) -> Result<String> {
+    let title = info.title.clone();
+    let body = info.body.clone();
+
+    let connection = &mut establish_connection();
+    let post = create_post(connection, &title[..], &body[..]);
+    println!("\nSaved draft {title} with id {}", post.id);
+
+    Ok(format!("OK"))
+}
+
+async fn index_json_diesel() -> impl Responder {
+
+    use self::schema::r_posts::dsl::*;
+
+    let connection = &mut establish_connection();
+    let results = r_posts
+        .filter(published.eq(true))
+        .limit(5)
+        .select(RPosts::as_select())
+        .load(connection)
+        .expect("Error loading posts");
+
+    println!("Displaying {} posts", results.len());
+    for post in results {
+        println!("{}", post.title);
+        println!("-----------");
+        println!("{}", post.body);
+    }
+
+    MyObj { name: "user", age: 28 }
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -1198,6 +1261,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/hi", web::get().to(manual_hello))
                     .route("/index2", web::get().to(manual_hello))
                     .route("/indexBodyJson", web::get().to(index_body_json))
+                    .route("/loadPosts", web::get().to(index_json_diesel))
                     .route("/indexTwoBody", web::get().to(index_two_body_type))
                     .route("/stream_sse", web::get().to(stream_sse))
                     .route("/echo", web::get().to(echo))
@@ -1213,6 +1277,7 @@ async fn main() -> std::io::Result<()> {
                     .service(get_query_params)
                     .service(stream_gen)
                     .service(index_for_err)
+                    .service(create_posts)
             )
 
     })

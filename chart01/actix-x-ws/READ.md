@@ -30,3 +30,13 @@ cargo watch -c -w src -x run
 ```
 
 See the cargo-watch README for more examples.
+
+
+## diesel
+
+By default diesel CLI depends on the following client libraries:
+
+- ibpq for the PostgreSQL backend
+- libmysqlclient for the Mysql backend
+- libsqlite3 for the SQLite backend
+

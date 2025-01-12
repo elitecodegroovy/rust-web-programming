@@ -1161,48 +1161,52 @@ use diesel::prelude::*;
 use self::models::*;
 use dotenvy::dotenv;
 use std::env;
+use diesel::r2d2::{self, ConnectionManager, Error};
 
-pub fn establish_connection() -> PgConnection {
+// simple type
+type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
+
+fn establish_db_connection() -> r2d2::Pool<ConnectionManager<PgConnection>> {
+
     dotenv().ok();
-
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    PgConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
+
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pool = r2d2::Pool::builder()
+        .build(manager)
+        .expect("Failed to create pool");
+    return pool;
 }
 
-pub fn create_post(conn: &mut PgConnection, title: &str, body: &str) -> RPosts {
+
+#[post("/createPosts")]
+async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> Result<String> {
     use crate::schema::r_posts;
-    let new_post = NewPost { title, body };
+    let title = info.title.clone();
+    let body = info.body.clone();
+    let mut conn = pool.get().expect("Failed to get DB connection");
+
+    let new_post = NewPost{ title: title.as_str(), body: body.as_str()};
 
     diesel::insert_into(r_posts::table)
         .values(&new_post)
         .returning(RPosts::as_returning())
-        .get_result(conn)
-        .expect("Error saving new post")
-}
-
-#[post("/createPosts")]
-async fn create_posts(info: web::Json<PostInfo>) -> Result<String> {
-    let title = info.title.clone();
-    let body = info.body.clone();
-
-    let connection = &mut establish_connection();
-    let post = create_post(connection, &title[..], &body[..]);
-    println!("\nSaved draft {title} with id {}", post.id);
+        .get_result(&mut conn)
+        .expect("Error saving new post");
 
     Ok(format!("OK"))
 }
 
-async fn index_json_diesel() -> impl Responder {
+async fn index_json_diesel(pool: web::Data<DbPool>) -> impl Responder {
 
     use self::schema::r_posts::dsl::*;
 
-    let connection = &mut establish_connection();
+    let mut con = pool.get().expect("Failed to get DB connection");
     let results = r_posts
         .filter(published.eq(true))
         .limit(5)
         .select(RPosts::as_select())
-        .load(connection)
+        .load(&mut con)
         .expect("Error loading posts");
 
     println!("Displaying {} posts", results.len());
@@ -1222,6 +1226,9 @@ async fn main() -> std::io::Result<()> {
     unsafe { std::env::set_var("RUST_LOG", "info"); }
     unsafe { std::env::set_var("RUST_BACKTRACE", "1"); }
     env_logger::init();
+
+    // db pool
+    let pool = establish_db_connection();
 
     HttpServer::new(move || {
         let logger = Logger::default();
@@ -1258,6 +1265,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/gapi")
                     .app_data(json_config)
                     .app_data(web::Data::new(data.clone()))
+                    .app_data(web::Data::new(pool.clone()))
                     .route("/hi", web::get().to(manual_hello))
                     .route("/index2", web::get().to(manual_hello))
                     .route("/indexBodyJson", web::get().to(index_body_json))

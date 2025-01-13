@@ -1,5 +1,6 @@
-use std::sync::Arc;
+#![allow(dead_code, unused_imports)]
 
+use std::sync::Arc;
 pub struct StringUtils;
 
 impl StringUtils {

@@ -1,5 +1,8 @@
+#![allow(dead_code, unused_imports)]
+
 use actix_web::web;
 use tokio_stream::StreamExt;
+
 
 const MAX_SIZE: usize = 10485760;
 

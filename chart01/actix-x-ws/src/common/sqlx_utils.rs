@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use serde_json::Value;
 use sqlx::database::HasArguments;
 use sqlx::mysql::MySqlRow;

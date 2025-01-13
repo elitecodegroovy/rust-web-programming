@@ -1,3 +1,6 @@
+#![allow(dead_code, unused_imports)]
+
+
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use base64::{engine::general_purpose, Engine};
 

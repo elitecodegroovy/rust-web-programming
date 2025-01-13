@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 #[macro_export]
 macro_rules! merge_web_param {
     ($param:expr,$payload:expr) => {{

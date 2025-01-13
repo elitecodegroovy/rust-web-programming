@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},

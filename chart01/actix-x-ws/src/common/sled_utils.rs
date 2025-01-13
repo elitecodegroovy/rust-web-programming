@@ -1,8 +1,9 @@
+#![allow(dead_code, unused_imports)]
+
 use std::sync::Arc;
 
 use prost::Message;
 use serde::{Deserialize, Serialize};
-
 #[derive(Clone, PartialEq, Message, Deserialize, Serialize)]
 pub struct IdValue {
     #[prost(int64, tag = "1")]

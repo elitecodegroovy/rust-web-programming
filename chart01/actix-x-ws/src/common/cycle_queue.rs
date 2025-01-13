@@ -1,3 +1,6 @@
+#![allow(dead_code, unused_imports)]
+
+
 #[derive(Debug)]
 pub struct CycleQueue<T> {
     capacity: usize,

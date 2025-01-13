@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 #[derive(Clone, Debug)]
 pub struct SimpleSequence {
     cache_size: u64,

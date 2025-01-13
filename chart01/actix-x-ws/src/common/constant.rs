@@ -1,3 +1,6 @@
+#![allow(dead_code, unused_imports)]
+
+
 use std::sync::Arc;
 
 pub const EMPTY_STR: &str = "";

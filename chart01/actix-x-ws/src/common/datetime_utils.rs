@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use chrono::{DateTime, FixedOffset, Utc};
 use std::time::SystemTime;
 

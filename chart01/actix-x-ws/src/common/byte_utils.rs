@@ -1,3 +1,6 @@
+#![allow(dead_code, unused_imports)]
+
+
 use byteorder::BigEndian;
 use byteorder::ReadBytesExt;
 use byteorder::WriteBytesExt;

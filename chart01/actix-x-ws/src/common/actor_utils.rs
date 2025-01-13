@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use actix::prelude::*;
 
 pub fn create_actor_at_thread<T>(actor: T) -> Addr<T>

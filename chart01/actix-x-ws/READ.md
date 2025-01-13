@@ -40,3 +40,8 @@ By default diesel CLI depends on the following client libraries:
 - libmysqlclient for the Mysql backend
 - libsqlite3 for the SQLite backend
 
+##  std::backtrace
+If you want panics and errors to both have backtraces, set RUST_BACKTRACE=1;
+If you want only errors to have backtraces, set RUST_LIB_BACKTRACE=1;
+If you want only panics to have backtraces, set RUST_BACKTRACE=1 and RUST_LIB_BACKTRACE=0.
+

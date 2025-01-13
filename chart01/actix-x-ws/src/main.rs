@@ -1,5 +1,6 @@
 mod schema;
 mod models;
+mod common;
 
 use actix_web::{get, post, error, web, App, http::{self, header::ContentEncoding, StatusCode}, middleware::Compress, middleware::Logger, HttpResponse, HttpServer, Responder, Result, HttpRequest};
 use actix_web::{ rt, body::{MessageBody, BoxBody}, http::header::ContentType, http::{header}, middleware::{from_fn, Next}, dev::{ServiceRequest, ServiceResponse, Service as _}, middleware::{ErrorHandlerResponse, ErrorHandlers}};
@@ -979,6 +980,14 @@ struct MyObj {
     age: u32,
 }
 
+#[allow(dead_code)]
+#[derive(Serialize)]
+struct MyObj2<T> {
+    name: &'static str,
+    age: u32,
+    data: T,
+}
+
 // Responder
 impl Responder for MyObj {
     type Body = BoxBody;
@@ -994,7 +1003,7 @@ impl Responder for MyObj {
 }
 
 async fn index_body_json() -> impl Responder {
-    MyObj { name: "user", age: 28 }
+    MyObj { name: "user", age: 28}
 }
 
 #[get("/stream_gen")]
@@ -1181,7 +1190,7 @@ fn establish_db_connection() -> r2d2::Pool<ConnectionManager<PgConnection>> {
 
 
 #[post("/createPosts")]
-async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> Result<String> {
+async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> HttpResponse {
     use crate::schema::r_posts;
     let title = info.title.clone();
     let body = info.body.clone();
@@ -1189,13 +1198,14 @@ async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> Res
 
     let new_post = NewPost{ title: title.as_str(), body: body.as_str()};
 
-    diesel::insert_into(r_posts::table)
-        .values(&new_post)
-        .returning(RPosts::as_returning())
-        .get_result(&mut conn)
-        .expect("Error saving new post");
+    let result = diesel::insert_into(r_posts::table)
+                        .values(&new_post)
+                        .get_result::<models::RPosts>(&mut conn);
 
-    Ok(format!("OK"))
+    match result {
+        Ok(r_posts) => HttpResponse::Ok().json(r_posts),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
 }
 
 async fn index_json_diesel(pool: web::Data<DbPool>) -> impl Responder {
@@ -1221,19 +1231,18 @@ async fn index_json_diesel(pool: web::Data<DbPool>) -> impl Responder {
 }
 
 #[allow(dead_code)]
-async fn update_posts(pool: web::Data<DbPool>) -> impl Responder {
+async fn update_posts(req: HttpRequest, pool: web::Data<DbPool>) -> impl Responder {
 
     use self::schema::r_posts::dsl::*;
-
+    let id_str: String = req.match_info().get("id").unwrap().parse().unwrap();
+    let number_id: i32 = id_str.parse().unwrap();
     let mut con = pool.get().expect("Failed to get DB connection");
-    let post = diesel::update(r_posts.find(1))
+    let post = diesel::update(r_posts.find(number_id))
         .set(published.eq(false))
         .returning(RPosts::as_returning())
         .get_result(&mut con)
         .unwrap();
-    println!("Published post {}", post.title);
-
-    MyObj { name: "user", age: 28 }
+    return post
 }
 
 #[allow(dead_code)]
@@ -1305,6 +1314,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/indexTwoBody", web::get().to(index_two_body_type))
                     .route("/stream_sse", web::get().to(stream_sse))
                     .route("/echo", web::get().to(echo))
+                    .route("/updatePost/{id}", web::post().to(update_posts))
                     .service(web::resource("/error-not-found").route(web::get().to(HttpResponse::InternalServerError)))
                     .service(submit_form)
                     .service(index_path_info)
@@ -1318,6 +1328,7 @@ async fn main() -> std::io::Result<()> {
                     .service(stream_gen)
                     .service(index_for_err)
                     .service(create_posts)
+
             )
 
     })

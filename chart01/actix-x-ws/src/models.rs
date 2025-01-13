@@ -1,3 +1,6 @@
+use actix_web::body::BoxBody;
+use actix_web::{HttpRequest, HttpResponse, Responder};
+use actix_web::http::header::ContentType;
 use diesel::prelude::*;
 use serde::{Serialize};
 
@@ -10,6 +13,20 @@ pub struct RPosts {
     pub title: String,
     pub body: String,
     pub published: bool,
+}
+
+impl Responder for RPosts {
+    type Body = BoxBody;
+
+    //noinspection DuplicatedCode
+    fn respond_to(self, _req: &HttpRequest) -> HttpResponse<Self::Body> {
+        let body = serde_json::to_string(&self).unwrap();
+
+        // Create response and set content type
+        HttpResponse::Ok()
+            .content_type(ContentType::json())
+            .body(body)
+    }
 }
 
 #[derive(Insertable)]

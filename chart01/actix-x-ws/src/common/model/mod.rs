@@ -45,6 +45,79 @@ pub struct PageResultOld<T> {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
+pub struct AR<T>
+where
+    T: Sized + Default,
+{
+    pub data: Option<T>,
+    pub success: bool,
+    pub code: u32,
+    pub msg: Option<String>,
+}
+
+impl<T> AR<T>
+where
+    T: Sized + Default
+{
+    pub fn success(data: Option<T>) -> Self {
+        Self {
+            data,
+            success: true,
+            code: 200,
+            msg: Option::from("操作成功!".to_string()),
+        }
+    }
+
+    pub fn success_flag(data: Option<T>, success: bool) -> Self {
+        Self {
+            data,
+            success,
+            code: 200,
+            msg: Option::from("操作成功!".to_string()),
+        }
+    }
+
+    pub fn error(code: u32, msg: Option<String>) -> Self {
+        Self {
+            code,
+            success: false,
+            msg,
+            data: None,
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PR<T> {
+    pub total_count: usize,
+    pub list: Vec<T>,
+}
+
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageResult<T> {
+    pub total_count: usize,
+    pub list: Vec<T>,
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct UserSession {
+    pub username: Arc<String>,
+    pub nickname: Option<String>,
+    pub roles: Vec<Arc<String>>,
+    pub extend_infos: HashMap<String, String>,
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct TokenSession {
+    pub username: Arc<String>,
+    pub roles: Vec<Arc<String>>,
+    pub extend_infos: HashMap<String, String>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct ApiResult<T>
 where
     T: Sized + Default,
@@ -76,26 +149,4 @@ where
             message,
         }
     }
-}
-
-#[derive(Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PageResult<T> {
-    pub total_count: usize,
-    pub list: Vec<T>,
-}
-
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct UserSession {
-    pub username: Arc<String>,
-    pub nickname: Option<String>,
-    pub roles: Vec<Arc<String>>,
-    pub extend_infos: HashMap<String, String>,
-}
-
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct TokenSession {
-    pub username: Arc<String>,
-    pub roles: Vec<Arc<String>>,
-    pub extend_infos: HashMap<String, String>,
 }

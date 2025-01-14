@@ -5,7 +5,7 @@ use diesel::prelude::*;
 use serde::{Serialize};
 
 #[allow(dead_code)]
-#[derive(Queryable, Selectable, Serialize)]
+#[derive(Queryable, Selectable, Serialize, Default)]
 #[diesel(table_name = crate::schema::r_posts)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct RPosts {

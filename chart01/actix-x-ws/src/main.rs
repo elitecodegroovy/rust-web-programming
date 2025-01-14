@@ -1172,7 +1172,7 @@ use dotenvy::dotenv;
 use std::env;
 #[allow(unused_imports)]
 use diesel::r2d2::{self, ConnectionManager, Error};
-
+use crate::common::model::AR;
 // simple type
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -1190,7 +1190,7 @@ fn establish_db_connection() -> r2d2::Pool<ConnectionManager<PgConnection>> {
 
 
 #[post("/createPosts")]
-async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> HttpResponse {
+async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> actix_web::Result<impl Responder> {
     use crate::schema::r_posts;
     let title = info.title.clone();
     let body = info.body.clone();
@@ -1203,15 +1203,15 @@ async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> Htt
                         .get_result::<models::RPosts>(&mut conn);
 
     match result {
-        Ok(r_posts) => HttpResponse::Ok().json(r_posts),
-        Err(_) => HttpResponse::InternalServerError().finish(),
+        Ok(data) => Ok(HttpResponse::Ok().json(AR::success(Some(data)))),
+        Err(r) =>  Ok(HttpResponse::Ok().json(AR::<()>::error(504, Some(r.to_string())))),
     }
 }
 
-async fn index_json_diesel(pool: web::Data<DbPool>) -> impl Responder {
-
+async fn index_json_diesel(pool: web::Data<DbPool>) -> Result<impl Responder> {
     use self::schema::r_posts::dsl::*;
 
+    // TODO ... pagination
     let mut con = pool.get().expect("Failed to get DB connection");
     let results = r_posts
         .filter(published.eq(true))
@@ -1221,17 +1221,15 @@ async fn index_json_diesel(pool: web::Data<DbPool>) -> impl Responder {
         .expect("Error loading posts");
 
     println!("Displaying {} posts", results.len());
-    for post in results {
-        println!("{}", post.title);
-        println!("-----------");
-        println!("{}", post.body);
+    if results.len() > 0 {
+        Ok(HttpResponse::Ok().json(AR::success_flag(Some(results), true)))
+    } else {
+        Ok(HttpResponse::Ok().json(AR::<Vec<RPosts>>::success(Some(Vec::with_capacity(0)))))
     }
-
-    MyObj { name: "user", age: 28 }
 }
 
 #[allow(dead_code)]
-async fn update_posts(req: HttpRequest, pool: web::Data<DbPool>) -> impl Responder {
+async fn update_posts(req: HttpRequest, pool: web::Data<DbPool>) -> Result<impl Responder>  {
 
     use self::schema::r_posts::dsl::*;
     let id_str: String = req.match_info().get("id").unwrap().parse().unwrap();
@@ -1240,24 +1238,49 @@ async fn update_posts(req: HttpRequest, pool: web::Data<DbPool>) -> impl Respond
     let post = diesel::update(r_posts.find(number_id))
         .set(published.eq(false))
         .returning(RPosts::as_returning())
-        .get_result(&mut con)
+        .get_result::<RPosts>(&mut con)
         .unwrap();
-    return post
+    Ok(HttpResponse::Ok().json(AR::success(Some(post))))
+}
+
+
+#[allow(dead_code)]
+async fn get_post_by_id(req: HttpRequest, pool: web::Data<DbPool>) -> Result<impl Responder>  {
+
+    use self::schema::r_posts::dsl::*;
+    let id_str: String = req.match_info().get("id").unwrap().parse().unwrap();
+    let number_id: i32 = id_str.parse().unwrap();
+    let mut con = pool.get().expect("Failed to get DB connection");
+
+    let post = r_posts
+                    .find(number_id)
+                    .select(RPosts::as_select())
+                    .first(&mut con)
+                    .optional();
+
+    match post {
+        Ok(Some(post)) => Ok(HttpResponse::Ok().json(AR::success(Some(post)))),
+        Ok(None) => Ok(HttpResponse::Ok().json(AR::success(Some(())))),
+        Err(r) => Ok(HttpResponse::Ok().json(AR::<String>::error(503, Some(r.to_string()))))
+    }
 }
 
 #[allow(dead_code)]
-async fn delete_posts(pool: web::Data<DbPool>) -> impl Responder {
-
+async fn delete_posts(req: HttpRequest, pool: web::Data<DbPool>) -> Result<impl Responder> {
     use self::schema::r_posts::dsl::*;
 
+    let id_str: String = req.match_info().get("id").unwrap().parse().unwrap();
+    let number_id: i32 = id_str.parse().unwrap();
+
     let mut con = pool.get().expect("Failed to get DB connection");
-    let num_deleted = diesel::delete(r_posts.filter(title.like("%test%".to_owned())))
+    let num_deleted = diesel::delete(r_posts.find(number_id))
         .execute(&mut con)
         .expect("Error deleting posts");
-
-    println!("Deleted {} posts", num_deleted);
-
-    MyObj { name: "user", age: 28 }
+    if num_deleted > 0 {
+        Ok(HttpResponse::Ok().json(AR::success(Some(()))))
+    } else {
+        Ok(HttpResponse::Ok().json(AR::success_flag(Some(()), false)))
+    }
 }
 
 #[actix_web::main]
@@ -1310,11 +1333,13 @@ async fn main() -> std::io::Result<()> {
                     .route("/hi", web::get().to(manual_hello))
                     .route("/index2", web::get().to(manual_hello))
                     .route("/indexBodyJson", web::get().to(index_body_json))
-                    .route("/loadPosts", web::get().to(index_json_diesel))
                     .route("/indexTwoBody", web::get().to(index_two_body_type))
                     .route("/stream_sse", web::get().to(stream_sse))
                     .route("/echo", web::get().to(echo))
+                    .route("/loadPosts", web::get().to(index_json_diesel))
                     .route("/updatePost/{id}", web::post().to(update_posts))
+                    .route("/post/getPostById/{id}", web::get().to(get_post_by_id))
+                    .route("/post/removePost/{id}", web::post().to(delete_posts))
                     .service(web::resource("/error-not-found").route(web::get().to(HttpResponse::InternalServerError)))
                     .service(submit_form)
                     .service(index_path_info)

@@ -15,11 +15,11 @@ use log::error as error_log;
 use std::time::Duration;
 
 use std::convert::Into;
-use std::cell::Cell;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 use actix_ws::AggregatedMessage;
+use redis::{Client, Commands, Connection};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -897,12 +897,11 @@ async fn manual_hello() -> impl Responder {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
-#[derive(Clone)]
 struct AppState {
     app_name: String,
-    count: Cell<usize>,
+    // count: Cell<usize>,
     global_count: Arc<AtomicUsize>,
+    redis_conn: Mutex<Connection>,
 }
 
 //noinspection ALL
@@ -1042,19 +1041,19 @@ fn config(cfg: &mut web::ServiceConfig) {
     );
 }
 
-#[get("/get_count")]
-async fn get_count(data: web::Data<AppState>) -> impl Responder {
-    format!("count: {}, global count {}", data.count.get(), data.global_count.load(Ordering::Relaxed))
-}
-
-#[post("/increase_one")]
-async fn increase_one(data: web::Data<AppState>) -> impl Responder {
-    let count = data.count.get();
-    data.global_count.fetch_add(1, Ordering::Relaxed);
-    data.count.set(count + 1);
-
-    format!("count: {}, global count {}", data.count.get(), data.global_count.load(Ordering::Relaxed))
-}
+// #[get("/get_count")]
+// async fn get_count(data: web::Data<AppState>) -> impl Responder {
+//     format!("count: {}, global count {}", data.count.get(), data.global_count.load(Ordering::Relaxed))
+// }
+//
+// #[post("/increase_one")]
+// async fn increase_one(data: web::Data<AppState>) -> impl Responder {
+//     let count = data.count.get();
+//     data.global_count.fetch_add(1, Ordering::Relaxed);
+//     data.count.set(count + 1);
+//
+//     format!("count: {}, global count {}", data.count.get(), data.global_count.load(Ordering::Relaxed))
+// }
 
 
 type RegisterResult = actix_web::Either<HttpResponse, Result<&'static str, actix_web::Error>>;
@@ -1283,6 +1282,47 @@ async fn delete_posts(req: HttpRequest, pool: web::Data<DbPool>) -> Result<impl 
     }
 }
 
+// Data model
+#[derive(Debug, Serialize, Deserialize)]
+struct Item {
+    id: String,
+    name: String,
+    value: String,
+}
+
+// Create operation
+async fn create_item(
+    state: web::Data<AppState>,
+    item: web::Json<Item>,
+) -> impl Responder {
+    let mut conn = state.redis_conn.lock().unwrap();
+
+    let key = format!("item:{}", item.id);
+    let value = serde_json::to_string(&item).unwrap();
+
+    match conn.set::<String, String, String>(key, value) {
+        Ok(_) => HttpResponse::Ok().json("Item created successfully"),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+// Read operation
+async fn get_item(
+    state: web::Data<AppState>,
+    id: web::Path<String>,
+) -> impl Responder {
+    let mut conn = state.redis_conn.lock().unwrap();
+
+    let key = format!("item:{}", id);
+    match conn.get::<String, String>(key) {
+        Ok(value) => match serde_json::from_str::<Item>(&value) {
+            Ok(item) => HttpResponse::Ok().json(item),
+            Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        },
+        Err(_) => HttpResponse::NotFound().body("Item not found"),
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     use futures_util::future::FutureExt;
@@ -1291,8 +1331,20 @@ async fn main() -> std::io::Result<()> {
     unsafe { std::env::set_var("RUST_BACKTRACE", "1"); }
     env_logger::init();
 
+    // redis cache : Connect to Redis
+    dotenv().ok();
+    let redis_url = env::var("REDIS_URL").expect("DATABASE_URL must be set");
+    let client = Client::open(redis_url).unwrap();
+    let conn = client.get_connection().unwrap();
+
     // db pool
     let pool = establish_db_connection();
+    // redis connection
+    let data = web::Data::new(AppState {
+        app_name: String::from("FastlyActix"),
+        global_count: Arc::new(AtomicUsize::new(0)),
+        redis_conn: Mutex::new(conn),
+    });
 
     HttpServer::new(move || {
         let logger = Logger::default();
@@ -1304,11 +1356,7 @@ async fn main() -> std::io::Result<()> {
                 error::InternalError::from_response(err, HttpResponse::Conflict().finish())
                     .into()
             });
-        let data = AppState {
-            app_name: String::from("FastlyActix"),
-            count: Cell::new(0),
-            global_count: Arc::new(AtomicUsize::new(0))
-        };
+
         App::new()
             .wrap(logger)
             .wrap(Compress::default())
@@ -1328,7 +1376,7 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::scope("/gapi")
                     .app_data(json_config)
-                    .app_data(web::Data::new(data.clone()))
+                    .app_data(data.clone())
                     .app_data(web::Data::new(pool.clone()))
                     .route("/hi", web::get().to(manual_hello))
                     .route("/index2", web::get().to(manual_hello))
@@ -1340,14 +1388,16 @@ async fn main() -> std::io::Result<()> {
                     .route("/updatePost/{id}", web::post().to(update_posts))
                     .route("/post/getPostById/{id}", web::get().to(get_post_by_id))
                     .route("/post/removePost/{id}", web::post().to(delete_posts))
+                    .route("/cache/createItems", web::post().to(create_item))
+                    .route("/cache/getItem/{id}", web::get().to(get_item))
                     .service(web::resource("/error-not-found").route(web::get().to(HttpResponse::InternalServerError)))
                     .service(submit_form)
                     .service(index_path_info)
                     .service(index2)
                     .service(index3)
                     .service(index4)
-                    .service(get_count)
-                    .service(increase_one)
+                    // .service(get_count)
+                    // .service(increase_one)
                     .service(index_form_data)
                     .service(get_query_params)
                     .service(stream_gen)

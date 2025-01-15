@@ -1323,6 +1323,38 @@ async fn get_item(
     }
 }
 
+// List all items (using pattern matching)
+async fn load_redis_items(state: web::Data<AppState>) -> impl Responder {
+    let mut conn = state.redis_conn.lock().unwrap();
+
+    match conn.keys::<String, Vec<String>>("item:*".to_string()) {
+        Ok(keys) => {
+            let mut items = Vec::new();
+            for key in keys {
+                if let Ok(value) = conn.get::<String, String>(key) {
+                    if let Ok(item) = serde_json::from_str::<Item>(&value) {
+                        items.push(item);
+                    }
+                }
+            }
+            HttpResponse::Ok().json(items)
+        }
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
+}
+
+async fn delete_item(state: web::Data<AppState>, id: web::Path<String>) -> impl Responder {
+    let mut conn = state.redis_conn.lock().unwrap();
+
+    let key = format!("item:{}", id);
+    match conn.del::<String, i32>(key) {
+        Ok(1) => HttpResponse::Ok().json("Item deleted successfully"),
+        Ok(0) => HttpResponse::NotFound().body("Item not found"),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        _ => HttpResponse::InternalServerError().body("Unexpected error"),
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     use futures_util::future::FutureExt;
@@ -1390,6 +1422,8 @@ async fn main() -> std::io::Result<()> {
                     .route("/post/removePost/{id}", web::post().to(delete_posts))
                     .route("/cache/createItems", web::post().to(create_item))
                     .route("/cache/getItem/{id}", web::get().to(get_item))
+                    .route("/cache/loadRedisItems", web::get().to(load_redis_items))
+                    .route("/cache/deleteItem/{id}", web::post().to(delete_item))
                     .service(web::resource("/error-not-found").route(web::get().to(HttpResponse::InternalServerError)))
                     .service(submit_form)
                     .service(index_path_info)
@@ -1501,10 +1535,13 @@ mod tests {
     }
 
     // #[actix_web::test]
-    // async fn test_index_not_ok() {
-    //     let req = test::TestRequest::default().to_http_request();
-    //     let resp = index_plaintext_call(req).await;
-    //     assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+    // async fn fetch_an_integer() {
+    //     let nodes = vec!["redis://10.111.27.32:6379/11"];
+    //     let client = redis::cluster::ClusterClient::new(nodes).unwrap();
+    //     let mut connection = client.get_connection().unwrap();
+    //     let _: () = connection.set("test", "test_data").unwrap();
+    //     let rv: String = connection.get("test").unwrap();
+    //     println!("{}", rv)
     // }
 
 }

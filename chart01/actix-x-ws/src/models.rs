@@ -3,9 +3,10 @@ use actix_web::{HttpRequest, HttpResponse, Responder};
 use actix_web::http::header::ContentType;
 use diesel::prelude::*;
 use serde::{Serialize};
+use chrono;
 
 #[allow(dead_code)]
-#[derive(Queryable, Selectable, Serialize, Default)]
+#[derive(Queryable, Selectable, Serialize, Default, Debug)]
 #[diesel(table_name = crate::schema::r_posts)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct RPosts {
@@ -13,6 +14,9 @@ pub struct RPosts {
     pub title: String,
     pub body: String,
     pub published: bool,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: Option<chrono::NaiveDateTime>,
+    pub created_by: String,
 }
 
 impl Responder for RPosts {
@@ -29,9 +33,12 @@ impl Responder for RPosts {
     }
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug)]
 #[diesel(table_name = crate::schema::r_posts)]
 pub struct NewPost<'a> {
     pub title: &'a str,
     pub body: &'a str,
+    pub created_at: chrono::NaiveDateTime,
+    pub updated_at: Option<chrono::NaiveDateTime>,
+    pub created_by: &'a str,
 }

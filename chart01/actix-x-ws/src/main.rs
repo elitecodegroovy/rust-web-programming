@@ -20,6 +20,7 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use actix_ws::AggregatedMessage;
 use redis::{Client, Commands, Connection};
+use chrono::prelude::{Utc};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -1187,25 +1188,41 @@ fn establish_db_connection() -> r2d2::Pool<ConnectionManager<PgConnection>> {
     return pool;
 }
 
-
-#[post("/post/createPosts")]
-async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> actix_web::Result<impl Responder> {
-    use crate::schema::r_posts;
-    let title = info.title.clone();
-    let body = info.body.clone();
-    let mut conn = pool.get().expect("Failed to get DB connection");
-
-    let new_post = NewPost{ title: title.as_str(), body: body.as_str()};
-
-    let result = diesel::insert_into(r_posts::table)
-                        .values(&new_post)
-                        .get_result::<models::RPosts>(&mut conn);
-
-    match result {
-        Ok(data) => Ok(HttpResponse::Ok().json(AR::success(Some(data)))),
-        Err(r) =>  Ok(HttpResponse::Ok().json(AR::<()>::error(504, Some(r.to_string())))),
-    }
-}
+//
+// #[post("/post/createPosts")]
+// async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> actix_web::Result<impl Responder> {
+//     use crate::schema::r_posts;
+//     let title = info.title.clone();
+//     let body = info.body.clone();
+//     let mut conn = pool.get().expect("Failed to get DB connection");
+//     let now = Utc::now().naive_utc();
+//
+//     let new_post = NewPost{
+//         title: title.as_str(),
+//         body: body.as_str(),
+//         created_at: now,
+//         updated_at: Some(now),
+//         created_by: "1"
+//     };
+//
+//     let result = diesel::insert_into(r_posts::table)
+//         .values(&new_post)
+//         .returning(r_posts::all_columns)
+//         .get_result(&mut conn);
+//
+//     match result {
+//         Ok(data) => {
+//             Ok(HttpResponse::Ok().json(AR::success(Some(data))))
+//         },
+//         Err(e) => {
+//             error_log!("Failed to create post: {}", e);
+//             Ok(HttpResponse::Ok().json(AR::<models::RPosts>::error(
+//                 500,
+//                 Some(format!("Database error: {}", e))
+//             )))
+//         }
+//     }
+// }
 
 async fn index_json_diesel(pool: web::Data<DbPool>) -> Result<impl Responder> {
     use self::schema::r_posts::dsl::*;
@@ -1457,7 +1474,7 @@ async fn main() -> std::io::Result<()> {
                     .service(get_query_params)
                     .service(stream_gen)
                     .service(index_for_err)
-                    .service(create_posts)
+                    // .service(create_posts)
 
             )
 

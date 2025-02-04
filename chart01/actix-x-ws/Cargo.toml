@@ -30,7 +30,7 @@ futures-util = "0.3.31"
 # uncomment these lines if you run into setup issues
 # pq-sys = { version = "0.6", features = ["bundled"] }
 # openssl-sys = { version = "0.9.100", features = ["vendored"] }
-diesel = { version = "2", features = ["sqlite", "uuid", "postgres", "r2d2"] }
+diesel = { version = "2", features = ["sqlite", "uuid", "postgres", "r2d2", "chrono"] }
 dotenvy = "0.15"
 r2d2 = "0.8"
 

@@ -1,5 +1,8 @@
 use actix_web::{web, App, HttpResponse, HttpServer};
 use diesel::prelude::*;
+
+use chrono::prelude::{Utc};
+
 use diesel::r2d2::{self, ConnectionManager};
 use dotenv::dotenv;
 use std::env;
@@ -16,6 +19,17 @@ async fn create_user(
     use schema::test_users::dsl::*;
 
     let mut conn = pool.try_get().expect("Failed to get DB connection");
+
+    let now = Utc::now().naive_utc();
+    let new_example = models::NewExample {
+        created_at: now,
+        updated_at: Some(now),
+    };
+
+    let database_record = diesel::insert_into(schema::r_examples::table)
+        .values(&new_example)
+        .get_result::<models::Example>(&mut conn);
+    println!("Inserted example: {:?}", database_record);
 
     let result = diesel::insert_into(test_users)
         .values(&*new_user)

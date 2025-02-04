@@ -5,3 +5,10 @@ diesel::table! {
         email -> Varchar,
     }
 }
+diesel::table! {
+    r_examples (id) {
+        id -> Int4,
+        created_at -> Timestamp,
+        updated_at -> Nullable<Timestamp>,
+    }
+}

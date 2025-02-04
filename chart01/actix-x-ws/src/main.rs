@@ -1188,7 +1188,7 @@ fn establish_db_connection() -> r2d2::Pool<ConnectionManager<PgConnection>> {
 }
 
 
-#[post("/createPosts")]
+#[post("/post/createPosts")]
 async fn create_posts(pool: web::Data<DbPool>, info: web::Json<PostInfo>) -> actix_web::Result<impl Responder> {
     use crate::schema::r_posts;
     let title = info.title.clone();
@@ -1235,7 +1235,7 @@ async fn update_posts(req: HttpRequest, pool: web::Data<DbPool>) -> Result<impl 
     let number_id: i32 = id_str.parse().unwrap();
     let mut con = pool.get().expect("Failed to get DB connection");
     let post = diesel::update(r_posts.find(number_id))
-        .set(published.eq(false))
+        .set(published.eq(true))
         .returning(RPosts::as_returning())
         .get_result::<RPosts>(&mut con)
         .unwrap();
@@ -1437,8 +1437,8 @@ async fn main() -> std::io::Result<()> {
                     .route("/indexTwoBody", web::get().to(index_two_body_type))
                     .route("/stream_sse", web::get().to(stream_sse))
                     .route("/echo", web::get().to(echo))
-                    .route("/loadPosts", web::get().to(index_json_diesel))
-                    .route("/updatePost/{id}", web::post().to(update_posts))
+                    .route("/post/loadPosts", web::get().to(index_json_diesel))
+                    .route("/post/updatePost/{id}", web::post().to(update_posts))
                     .route("/post/getPostById/{id}", web::get().to(get_post_by_id))
                     .route("/post/removePost/{id}", web::post().to(delete_posts))
                     .route("/cache/createCacheItem", web::post().to(create_redis_item))

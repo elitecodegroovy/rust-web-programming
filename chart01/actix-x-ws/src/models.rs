@@ -14,9 +14,9 @@ pub struct RPosts {
     pub title: String,
     pub body: String,
     pub published: bool,
-    pub created_at: chrono::NaiveDateTime,
+    pub created_at: Option<chrono::NaiveDateTime>,
     pub updated_at: Option<chrono::NaiveDateTime>,
-    pub created_by: String,
+    pub created_by: Option<String>,
 }
 
 impl Responder for RPosts {

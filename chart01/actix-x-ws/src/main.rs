@@ -3,7 +3,7 @@ mod models;
 mod common;
 
 use actix_web::{get, post, error, web, App, http::{self, header::ContentEncoding, StatusCode}, middleware::Compress, middleware::Logger, HttpResponse, HttpServer, Responder, Result, HttpRequest};
-use actix_web::{ rt, body::{MessageBody, BoxBody}, http::header::ContentType, http::{header}, middleware::{from_fn, Next}, dev::{ServiceRequest, ServiceResponse, Service as _}, middleware::{ErrorHandlerResponse, ErrorHandlers}};
+use actix_web::{ rt, body::{MessageBody, BoxBody}, http::header::ContentType, http::{header}, middleware::{from_fn, Next}, dev::{ServiceRequest, ServiceResponse}, middleware::{ErrorHandlerResponse, ErrorHandlers}};
 use serde::Serialize;
 use serde::Deserialize;
 use std::task::Poll;
@@ -1290,8 +1290,14 @@ struct Item {
     value: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct ItemKV {
+    key: String,
+    value: Item,
+}
+
 // Create operation
-async fn create_item(
+async fn create_redis_item(
     state: web::Data<AppState>,
     item: web::Json<Item>,
 ) -> impl Responder {
@@ -1307,12 +1313,8 @@ async fn create_item(
 }
 
 // Read operation
-async fn get_item(
-    state: web::Data<AppState>,
-    id: web::Path<String>,
-) -> impl Responder {
+async fn get_redis_item(state: web::Data<AppState>, id: web::Path<String>, ) -> impl Responder {
     let mut conn = state.redis_conn.lock().unwrap();
-
     let key = format!("item:{}", id);
     match conn.get::<String, String>(key) {
         Ok(value) => match serde_json::from_str::<Item>(&value) {
@@ -1329,17 +1331,37 @@ async fn load_redis_items(state: web::Data<AppState>) -> impl Responder {
 
     match conn.keys::<String, Vec<String>>("item:*".to_string()) {
         Ok(keys) => {
-            let mut items = Vec::new();
+            let mut items = Vec::with_capacity(keys.len());
+            
             for key in keys {
-                if let Ok(value) = conn.get::<String, String>(key) {
-                    if let Ok(item) = serde_json::from_str::<Item>(&value) {
-                        items.push(item);
+                // Use match for better error handling
+                match conn.get::<String, String>(key.clone()) {
+                    Ok(value) => {
+                        match serde_json::from_str::<Item>(&value) {
+                            Ok(item) => {
+                                items.push(ItemKV {
+                                    key,
+                                    value: item
+                                });
+                            },
+                            Err(e) => {
+                                error_log!("Failed to parse item from Redis value: {}", e);
+                                continue;
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        error_log!("Failed to get value for key {}: {}", key, e);
+                        continue;
                     }
                 }
             }
-            HttpResponse::Ok().json(items)
+            HttpResponse::Ok().json(AR::success(Some(items)))
         }
-        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+        Err(e) => {
+            error_log!("Failed to get keys from Redis: {}", e);
+            HttpResponse::InternalServerError().json(AR::<Vec<ItemKV>>::error(500, Some(e.to_string())))
+        }
     }
 }
 
@@ -1357,7 +1379,6 @@ async fn delete_item(state: web::Data<AppState>, id: web::Path<String>) -> impl 
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    use futures_util::future::FutureExt;
     // Actix logs all errors at the WARN log level.
     unsafe { std::env::set_var("RUST_LOG", "info"); }
     unsafe { std::env::set_var("RUST_BACKTRACE", "1"); }
@@ -1392,13 +1413,13 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(logger)
             .wrap(Compress::default())
-            .wrap_fn(|req, srv| {
-                info!(">>>. You requested: {}", req.path());
-                srv.call(req).map(|res| {
-                    info!(">>>. You response ");
-                    res
-                })
-            })
+            // .wrap_fn(|req, srv| {
+            //     info!(">>>. You requested: {}", req.path());
+            //     srv.call(req).map(|res| {
+            //         info!(">>>. You response ");
+            //         res
+            //     })
+            // })
             .wrap(from_fn(my_x_middleware))
             .wrap(
                 ErrorHandlers::new()
@@ -1420,8 +1441,8 @@ async fn main() -> std::io::Result<()> {
                     .route("/updatePost/{id}", web::post().to(update_posts))
                     .route("/post/getPostById/{id}", web::get().to(get_post_by_id))
                     .route("/post/removePost/{id}", web::post().to(delete_posts))
-                    .route("/cache/createItems", web::post().to(create_item))
-                    .route("/cache/getItem/{id}", web::get().to(get_item))
+                    .route("/cache/createCacheItem", web::post().to(create_redis_item))
+                    .route("/cache/getCacheItem/{id}", web::get().to(get_redis_item))
                     .route("/cache/loadRedisItems", web::get().to(load_redis_items))
                     .route("/cache/deleteItem/{id}", web::post().to(delete_item))
                     .service(web::resource("/error-not-found").route(web::get().to(HttpResponse::InternalServerError)))

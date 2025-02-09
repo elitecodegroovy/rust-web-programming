@@ -1,6 +1,8 @@
 [print_schema]
+# skip generating missing sql type definitions
+generate_missing_sql_type_definitions = false
 # This will cause only the users and posts tables to be output
-filter = { only_tables = ["r_posts"] }
+#filter = { only_tables = ["r_posts"] }
 
 # This will cause all tables *except* the comments table to be
 # output

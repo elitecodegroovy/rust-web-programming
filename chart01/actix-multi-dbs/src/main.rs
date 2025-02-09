@@ -21,12 +21,20 @@ pub fn establish_connection() -> DbState {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let secondary_database_url = env::var("SECONDARY_DATABASE_URL").expect("SECONDARY_DATABASE_URL must be set");
 
+    // let max_conn = env::var("MAX_CONNECTION_SIZE").expect("MAX_CONNECTION_SIZE must be set");
+    // let db_conn_size = max_conn.parse::<u32>().unwrap();
+
     let pg_manager = ConnectionManager::<PgConnection>::new(database_url);
     let mysql_manager = ConnectionManager::<MysqlConnection>::new(secondary_database_url);
 
-    let pg_pool = Pool::builder().build(pg_manager).expect("Failed to create PG pool");
+    let pg_pool = Pool::builder().max_size(std::env::var("POOL_MAX_SIZE")
+                                                                                .ok()
+                                                                                .and_then(|s| s.parse::<u32>().ok())
+                                                                                .unwrap_or(20)) // Default to 10 if not set
+                                                    .build(pg_manager).expect("Failed to create PG pool");
+    println!("init pg DB");
     let mysql_pool = Pool::builder().build(mysql_manager).expect("Failed to create MySQL pool");
-    println!("init DB");
+    println!("init mysql DB");
     DbState { pg_pool, mysql_pool }
 
 }

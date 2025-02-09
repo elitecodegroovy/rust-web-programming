@@ -40,6 +40,10 @@ By default diesel CLI depends on the following client libraries:
 - libmysqlclient for the Mysql backend
 - libsqlite3 for the SQLite backend
 
+``` 
+sudo ln -s /opt/anaconda3/lib/libpq.5.dylib /usr/local/lib/libpq.5.dylib
+sudo ln -s /opt/anaconda3/lib/libmysqlclient.20.dylib /usr/local/lib/libmysqlclient.20.dylib
+```
 ##  std::backtrace
 If you want panics and errors to both have backtraces, set RUST_BACKTRACE=1;
 If you want only errors to have backtraces, set RUST_LIB_BACKTRACE=1;

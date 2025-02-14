@@ -1,5 +1,5 @@
 [package]
-name = "deep-mindx"
+name = "mindx"
 version = "0.1.0"
 edition = "2021"
 
@@ -29,7 +29,7 @@ members = [
 ]
 
 [[bin]]
-name = "rnacos"
+name = "mindx"
 path = "src/main.rs"
 
 [dependencies]
@@ -63,8 +63,8 @@ dotenv = "0.15"
 #rust-embed="6.6.1"
 mime_guess = { version = "2" }
 # db
-rusqlite = { version = "0.25", features = ["bundled"] }
-rsql_builder = "0.1.5"
+#rusqlite = { version = "0.33.0", features = ["bundled"] }
+#rsql_builder = "0.1.5"
 inner-mem-cache = "0.1.7"
 rnacos-web-dist-wrap = "=0.5.11"
 nacos_rust_client = "0.3.2"
@@ -112,7 +112,7 @@ fs2 = "0.4.3"
 dirs = "5.0"
 bitflags = "2.6.0"
 
-sqlx = { version = "0.6", features = ["runtime-tokio-rustls","mysql"] }
+sqlx = { version = "0.8.3", features = ["runtime-tokio-rustls", "mysql", "postgres"] }
 
 [dependencies.uuid]
 version = "1.2.1"

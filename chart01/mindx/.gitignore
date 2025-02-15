@@ -6,6 +6,6 @@ naming.db
 *.DS_Store
 .vscode/
 
-nacos_db/
+mindx_db/
 .env
 cluster_example/

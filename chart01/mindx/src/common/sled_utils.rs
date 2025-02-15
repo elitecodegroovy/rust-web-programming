@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use prost::Message;
 use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
+use sqlx::Encode;
 
 #[derive(Clone, PartialEq, Message, Deserialize, Serialize)]
 pub struct IdValue {

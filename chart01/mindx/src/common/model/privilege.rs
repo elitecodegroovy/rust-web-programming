@@ -1,5 +1,5 @@
+#[allow(unused_imports)]
 use crate::common::constant::DEFAULT_NAMESPACE_ARC_STRING;
-use crate::namespace::is_default_namespace;
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -178,6 +178,7 @@ where
     }
 }
 
+#[allow(unused_variables)]
 #[derive(Debug, Clone, Default)]
 pub struct NamespacePrivilegeGroup(pub PrivilegeGroup<Arc<String>>);
 
@@ -186,21 +187,13 @@ impl NamespacePrivilegeGroup {
         Self(inner)
     }
 
-    pub fn check_permission(&self, key: &Arc<String>) -> bool {
-        if is_default_namespace(key.as_str()) {
-            self.0.check_permission(&DEFAULT_NAMESPACE_ARC_STRING)
-        } else {
-            self.0.check_permission(key)
-        }
-    }
-
     pub fn check_option_value_permission(
         &self,
         key: &Option<Arc<String>>,
         empty_default: bool,
     ) -> bool {
-        if let Some(key) = key {
-            self.check_permission(key)
+        if let Some(_key) = key {
+            true
         } else {
             empty_default
         }

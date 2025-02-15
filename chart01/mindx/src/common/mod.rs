@@ -3,7 +3,6 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub mod actor_utils;
-pub mod appdata;
 pub mod byte_utils;
 pub mod constant;
 pub mod crypto_utils;
@@ -18,13 +17,13 @@ pub mod model;
 pub mod option_utils;
 pub mod pb;
 pub mod protobuf_utils;
-pub mod rusqlite_utils;
 pub mod sequence_utils;
 pub mod sled_utils;
 pub mod sqlx_utils;
 pub mod string_utils;
 pub mod tempfile;
 pub mod web_utils;
+pub mod appdata;
 /*
 use lazy_static::lazy_static;
 lazy_static! {
@@ -34,7 +33,7 @@ lazy_static! {
 }
 */
 
-const DEFAULT_DB_PATH: &str = "nacos_db";
+const DEFAULT_DB_PATH: &str = "mindx_db";
 
 #[derive(Default, Clone, Debug)]
 pub struct NamingSysConfig {
@@ -94,112 +93,111 @@ pub struct AppSysConfig {
 
 impl AppSysConfig {
     pub fn init_from_env() -> Self {
-        //println!("init_from_env");
         let config_db_file =
-            std::env::var("RNACOS_CONFIG_DB_FILE").unwrap_or("config.db".to_owned());
-        let config_max_content = std::env::var("RNACOS_CONFIG_MAX_CONTENT")
+            std::env::var("MINDX_CONFIG_DB_FILE").unwrap_or("config.db".to_owned());
+        let config_max_content = std::env::var("MINDX_CONFIG_MAX_CONTENT")
             .unwrap_or("10485760".to_owned())
             .parse()
             .unwrap_or(10 * 1024 * 1024);
-        let http_port = std::env::var("RNACOS_HTTP_PORT")
+        let http_port = std::env::var("MINDX_HTTP_PORT")
             .unwrap_or("8848".to_owned())
             .parse()
             .unwrap_or(8848);
-        let http_workers = std::env::var("RNACOS_HTTP_WORKERS")
+        let http_workers = std::env::var("MINDX_HTTP_WORKERS")
             .unwrap_or("".to_owned())
             .parse()
             .ok();
-        let grpc_port = std::env::var("RNACOS_GRPC_PORT")
+        let grpc_port = std::env::var("MINDX_GRPC_PORT")
             .unwrap_or("".to_owned())
             .parse()
             .unwrap_or(http_port + 1000);
-        let http_console_port = std::env::var("RNACOS_HTTP_CONSOLE_PORT")
+        let http_console_port = std::env::var("MINDX_HTTP_CONSOLE_PORT")
             .unwrap_or("".to_owned())
             .parse()
             .unwrap_or(http_port + 2000);
-        let run_in_docker = std::env::var("RNACOS_RUN_IN_DOCKER")
+        let run_in_docker = std::env::var("MINDX_RUN_IN_DOCKER")
             .unwrap_or("".to_owned())
             .eq_ignore_ascii_case("true");
         let local_db_dir = Self::get_data_dir(run_in_docker);
-        let raft_node_id = std::env::var("RNACOS_RAFT_NODE_ID")
+        let raft_node_id = std::env::var("MINDX_RAFT_NODE_ID")
             .unwrap_or("1".to_owned())
             .parse()
             .unwrap_or(1);
         let raft_node_addr =
-            std::env::var("RNACOS_RAFT_NODE_ADDR").unwrap_or(format!("127.0.0.1:{}", &grpc_port));
-        let raft_auto_init = std::env::var("RNACOS_RAFT_AUTO_INIT")
+            std::env::var("MINDX_RAFT_NODE_ADDR").unwrap_or(format!("127.0.0.1:{}", &grpc_port));
+        let raft_auto_init = std::env::var("MINDX_RAFT_AUTO_INIT")
             .unwrap_or("".to_owned())
             .parse()
             .unwrap_or(raft_node_id == 1);
-        let raft_join_addr = std::env::var("RNACOS_RAFT_JOIN_ADDR").unwrap_or_default();
-        let console_login_timeout = std::env::var("RNACOS_CONSOLE_LOGIN_TIMEOUT")
+        let raft_join_addr = std::env::var("MINDX_RAFT_JOIN_ADDR").unwrap_or_default();
+        let console_login_timeout = std::env::var("MINDX_CONSOLE_LOGIN_TIMEOUT")
             .unwrap_or("86400".to_owned())
             .parse()
             .unwrap_or(86400);
-        let console_login_one_hour_limit = std::env::var("RNACOS_CONSOLE_LOGIN_ONE_HOUR_LIMIT")
+        let console_login_one_hour_limit = std::env::var("MINDX_CONSOLE_LOGIN_ONE_HOUR_LIMIT")
             .unwrap_or("5".to_owned())
             .parse()
             .unwrap_or(5);
-        let openapi_login_timeout = std::env::var("RNACOS_API_LOGIN_TIMEOUT")
+        let openapi_login_timeout = std::env::var("MINDX_API_LOGIN_TIMEOUT")
             .unwrap_or("3600".to_owned())
             .parse()
             .unwrap_or(3600);
-        let openapi_login_one_minute_limit = std::env::var("RNACOS_API_LOGIN_ONE_MINUTE_LIMIT")
+        let openapi_login_one_minute_limit = std::env::var("MINDX_API_LOGIN_ONE_MINUTE_LIMIT")
             .unwrap_or("100".to_owned())
             .parse()
             .unwrap_or(100);
-        let raft_snapshot_log_size = std::env::var("RNACOS_RAFT_SNAPSHOT_LOG_SIZE")
+        let raft_snapshot_log_size = std::env::var("MINDX_RAFT_SNAPSHOT_LOG_SIZE")
             .unwrap_or("10000".to_owned())
             .parse()
             .unwrap_or(10000);
-        let enable_no_auth_console = std::env::var("RNACOS_ENABLE_NO_AUTH_CONSOLE")
+        let enable_no_auth_console = std::env::var("MINDX_ENABLE_NO_AUTH_CONSOLE")
             .unwrap_or("false".to_owned())
             .parse()
             .unwrap_or(false);
-        let gmt_fixed_offset_hours = std::env::var("RNACOS_GMT_OFFSET_HOURS")
+        let gmt_fixed_offset_hours = std::env::var("MINDX_GMT_OFFSET_HOURS")
             .unwrap_or_default()
             .parse()
             .ok();
-        let openapi_enable_auth = std::env::var("RNACOS_ENABLE_OPEN_API_AUTH")
+        let openapi_enable_auth = std::env::var("MINDX_ENABLE_OPEN_API_AUTH")
             .unwrap_or("false".to_owned())
             .parse()
             .unwrap_or(false);
-        let cluster_token = std::env::var("RNACOS_CLUSTER_TOKEN")
+        let cluster_token = std::env::var("MINDX_CLUSTER_TOKEN")
             .map(Arc::new)
             .unwrap_or(constant::EMPTY_ARC_STRING.clone());
-        let mut backup_token = std::env::var("RNACOS_BACKUP_TOKEN")
+        let mut backup_token = std::env::var("MINDX_BACKUP_TOKEN")
             .map(Arc::new)
             .unwrap_or(constant::EMPTY_ARC_STRING.clone());
         if backup_token.len() < 32 {
             backup_token = constant::EMPTY_ARC_STRING.clone();
         }
         let init_admin_username =
-            StringUtils::map_not_empty(std::env::var("RNACOS_INIT_ADMIN_USERNAME").ok())
+            StringUtils::map_not_empty(std::env::var("MINDX_INIT_ADMIN_USERNAME").ok())
                 .unwrap_or("admin".to_owned());
         let init_admin_password =
-            StringUtils::map_not_empty(std::env::var("RNACOS_INIT_ADMIN_PASSWORD").ok())
+            StringUtils::map_not_empty(std::env::var("MINDX_INIT_ADMIN_PASSWORD").ok())
                 .unwrap_or("admin".to_owned());
-        let metrics_enable = std::env::var("RNACOS_ENABLE_METRICS")
+        let metrics_enable = std::env::var("MINDX_ENABLE_METRICS")
             .unwrap_or("true".to_owned())
             .parse()
             .unwrap_or(true);
         let mut metrics_collect_interval_second =
-            std::env::var("RNACOS_METRICS_COLLECT_INTERVAL_SECOND")
+            std::env::var("MINDX_METRICS_COLLECT_INTERVAL_SECOND")
                 .unwrap_or("15".to_owned())
                 .parse()
                 .unwrap_or(15);
-        let console_captcha_enable = std::env::var("RNACOS_CONSOLE_ENABLE_CAPTCHA")
+        let console_captcha_enable = std::env::var("MINDX_CONSOLE_ENABLE_CAPTCHA")
             .unwrap_or("true".to_owned())
             .parse()
             .unwrap_or(true);
         if metrics_collect_interval_second < 1 {
             metrics_collect_interval_second = 1;
         }
-        let metrics_log_enable = std::env::var("RNACOS_METRICS_ENABLE_LOG")
+        let metrics_log_enable = std::env::var("MINDX_METRICS_ENABLE_LOG")
             .unwrap_or("false".to_owned())
             .parse()
             .unwrap_or(false);
-        let mut metrics_log_interval_second = std::env::var("RNACOS_METRICS_LOG_INTERVAL_SECOND")
+        let mut metrics_log_interval_second = std::env::var("MINDX_METRICS_LOG_INTERVAL_SECOND")
             .unwrap_or("60".to_owned())
             .parse()
             .unwrap_or(60);
@@ -209,12 +207,12 @@ impl AppSysConfig {
         if metrics_log_interval_second < metrics_collect_interval_second {
             metrics_collect_interval_second = metrics_log_interval_second;
         }
-        let naming_health_timeout = std::env::var("RNACOS_NAMING_HEALTH_TIMEOUT_SECOND")
+        let naming_health_timeout = std::env::var("MINDX_NAMING_HEALTH_TIMEOUT_SECOND")
             .unwrap_or("15".to_owned())
             .parse()
             .unwrap_or(15)
             * 1000;
-        let mut naming_instance_timeout = std::env::var("RNACOS_NAMING_INSTANCE_TIMEOUT_SECOND")
+        let mut naming_instance_timeout = std::env::var("MINDX_NAMING_INSTANCE_TIMEOUT_SECOND")
             .unwrap_or("30".to_owned())
             .parse()
             .unwrap_or(30)
@@ -260,9 +258,9 @@ impl AppSysConfig {
 
     /// 获取数据目录
     fn get_data_dir(run_in_docker: bool) -> String {
-        if let Ok(v) = std::env::var("RNACOS_DATA_DIR") {
+        if let Ok(v) = std::env::var("MINDX_DATA_DIR") {
             v
-        } else if let Ok(v) = std::env::var("RNACOS_CONFIG_DB_DIR") {
+        } else if let Ok(v) = std::env::var("MINDX_CONFIG_DB_DIR") {
             v
         } else if run_in_docker {
             // 运行在docker，默认值保持一致
@@ -271,7 +269,7 @@ impl AppSysConfig {
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             {
                 if let Some(mut home) = dirs::home_dir() {
-                    home.push(".local/share/r-nacos/nacos_db");
+                    home.push(".local/share/mindx/mindx_db");
                     return home.to_string_lossy().to_string();
                 }
             }
@@ -311,4 +309,8 @@ pub fn gen_uuid() -> i64 {
 
 pub fn get_app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
+}
+
+pub fn get_app_log_level() -> String {
+    std::env::var("RUST_LOG").unwrap_or("info".to_owned())
 }

@@ -11,7 +11,6 @@ pub mod limiter_utils;
 pub mod macros;
 pub mod option_utils;
 pub mod protobuf_utils;
-pub mod rusqlite_utils;
 pub mod sequence_utils;
 pub mod sled_utils;
 pub mod sqlx_utils;

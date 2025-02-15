@@ -64,7 +64,9 @@ dotenv = "0.15"
 mime_guess = { version = "2" }
 # db
 #rusqlite = { version = "0.33.0", features = ["bundled"] }
-#rsql_builder = "0.1.5"
+#sqlx-sqlite= { version = "0.8.3" }
+#libsqlite3-sys = { version = "0.31.0"}
+rsql_builder = "0.1.5"
 inner-mem-cache = "0.1.7"
 rnacos-web-dist-wrap = "=0.5.11"
 nacos_rust_client = "0.3.2"
@@ -112,7 +114,7 @@ fs2 = "0.4.3"
 dirs = "5.0"
 bitflags = "2.6.0"
 
-sqlx = { version = "0.8.3", features = ["runtime-tokio-rustls", "mysql", "postgres"] }
+sqlx = { version = "0.8.3", features = ["runtime-tokio", "tls-native-tls", "mysql", "postgres", "uuid"] }
 
 [dependencies.uuid]
 version = "1.2.1"
@@ -120,6 +122,7 @@ features = [
     "v4",                # Lets you generate random UUIDs
     "fast-rng",          # Use a faster (but still sufficiently random) RNG
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+    "serde"
 ]
 
 [build-dependencies]

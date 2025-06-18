@@ -24,4 +24,56 @@ Rust web programming is a book for rust programmer
 - **path_dedot**： This is a library for extending Path and PathBuf in order to parse the path which contains dots.
 
 
+We believe that software must become safer; that this is paramount in critical infrastructure;
+and that Rust is an outstanding choice of technology for this purpose.
 
+Explore Rust
+We introduce engineers to Rust as a language:
+Find out if Rust is a good fit for your projects.
+Get to know the tooling.
+Introduces language interoperability (using Rust in a C project).
+Rust for Web
+Based on years of web server development, we teach engineers to develop state-of-the-art web applications in Rust. We'll tackle:
+The Tokio Runtime
+Using dedicated web frameworks like Axum or Rocket
+Interacting with databases like Postgres
+Embedded Rust
+We can cover the basics of embedded Rust, or we can do a deep dive. Topics typically include:
+An overview of the Rust Embedded ecosystem
+Writing a platform-agnostic driver
+Async Rust for embedded
+Basic knowledge of Rust (or attendance of our 'Explore Rust' program) is required.
+Rust in existing projects
+We show you how to introduce Rust step by step in existing projects. Topics include:
+Using C code from Rust, or vice versa
+Generating FFI bindings automatically, and designing idiomatic Rust APIs
+Rust extensions for higher-level languages (e.g. Python, Ruby, NodeJS)
+Rust in Python projects
+We can teach you to write Rust code that integrates seamlessly with your existing Python code, resulting in more speed and reliability. We'll cover:
+Bindings with PyO3
+Integrating the async machinery of both languages
+How to build and deploy your Rust code to be usable from Python
+
+
+web:
+- The Tokio Runtime
+- Using dedicated web frameworks like Axum or Rocket
+- Interacting with databases like Postgres
+
+others:
+We show you how to introduce Rust step by step in existing projects. Topics include
+- Using C code from Rust, or vice versa
+- Generating FFI bindings automatically, and designing idiomatic Rust APIs
+- Rust extensions for higher-level languages (e.g. Python, Ruby, NodeJS)
+
+
+Rust in Python projects:
+We can teach you to write Rust code that integrates seamlessly with your existing Python code, resulting in more speed and reliability. We'll cover:
+- Bindings with PyO3
+- Integrating the async machinery of both languages
+- How to build and deploy your Rust code to be usable from Python
+
+
+## tasks
+- https://github.com/trifectatechfoundation/teach-rs?tab=readme-ov-file
+- 

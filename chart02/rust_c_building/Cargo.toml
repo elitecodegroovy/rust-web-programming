@@ -9,3 +9,9 @@ cc = "1"
 
 [dependencies]
 anyhow = "1"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3

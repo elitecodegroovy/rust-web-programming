@@ -74,6 +74,11 @@ We can teach you to write Rust code that integrates seamlessly with your existin
 - How to build and deploy your Rust code to be usable from Python
 
 
+books
+- rust_c_building chart02/rust_c_building
+
 ## tasks
 - https://github.com/trifectatechfoundation/teach-rs?tab=readme-ov-file
-- 
+
+
+

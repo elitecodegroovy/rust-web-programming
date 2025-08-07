@@ -22,5 +22,5 @@ async fn main_async_workflow() { // ⑥
 
 #[tokio::main] 
 async fn main() {
-    main_async_workflow().await; 
+    main_async_workflow().await;
 }

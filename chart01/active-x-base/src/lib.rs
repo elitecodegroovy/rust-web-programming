@@ -67,8 +67,6 @@ use std::iter;
 use std::vec::IntoIter;
 
 #[allow(dead_code)]
-// This function combines two `Vec<i32>` and returns an iterator over it.
-// Look how complicated its return type is!
 fn combine_vecs_explicit_return_type(
     v: Vec<i32>,
     u: Vec<i32>,
@@ -76,8 +74,7 @@ fn combine_vecs_explicit_return_type(
     v.into_iter().chain(u.into_iter()).cycle()
 }
 
-// This is the exact same function, but its return type uses `impl Trait`.
-// Look how much simpler it is!
+
 fn combine_vecs(
     v: Vec<i32>,
     u: Vec<i32>,

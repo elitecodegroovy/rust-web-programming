@@ -28,7 +28,6 @@ async fn post_request() -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     get_request().await?;
     post_request().await?;
     Ok(())

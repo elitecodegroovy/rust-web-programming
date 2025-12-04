@@ -80,5 +80,11 @@ books
 ## tasks
 - https://github.com/trifectatechfoundation/teach-rs?tab=readme-ov-file
 
+## cmd
 
+### clean compiled files
+
+``` 
+find . -type d -name 'target' -exec rm -rf {} + 
+```
 
